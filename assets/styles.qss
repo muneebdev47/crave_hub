@@ -1,0 +1,57 @@
+/* ===== GLOBAL ===== */
+* {
+    font-family: "Segoe UI";
+    font-size: 14px;
+}
+
+QMainWindow {
+    background-color: #121212;
+}
+
+/* ===== LABELS ===== */
+QLabel {
+    color: #FFFFFF;
+}
+
+/* ===== INPUTS ===== */
+QLineEdit {
+    background-color: #1E1E1E;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 8px;
+    color: white;
+}
+
+QLineEdit:focus {
+    border: 1px solid #B22222;
+}
+
+/* ===== BUTTONS ===== */
+QPushButton {
+    background-color: #B22222;
+    color: white;
+    padding: 10px;
+    border-radius: 6px;
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background-color: #8B1A1A;
+}
+
+/* ===== SIDEBAR ===== */
+QWidget#Sidebar {
+    background-color: #000000;
+}
+
+QPushButton#NavButton {
+    background-color: transparent;
+    color: white;
+    text-align: left;
+    padding: 12px;
+    border: none;
+}
+
+QPushButton#NavButton:hover {
+    background-color: #1E1E1E;
+}

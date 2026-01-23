@@ -1,0 +1,10 @@
+altgraph==0.17.5
+macholib==1.16.4
+packaging==26.0
+pillow==12.1.0
+pyinstaller==6.18.0
+pyinstaller-hooks-contrib==2026.0
+PyQt6==6.10.2
+PyQt6-Qt6==6.10.1
+PyQt6_sip==13.11.0
+setuptools==80.10.1

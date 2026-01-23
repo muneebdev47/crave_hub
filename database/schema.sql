@@ -1,0 +1,29 @@
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    role TEXT NOT NULL,
+    is_active INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS menu_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    price REAL NOT NULL,
+    is_available INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_type TEXT NOT NULL,
+    total REAL NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER,
+    menu_item_id INTEGER,
+    quantity INTEGER,
+    price REAL
+);
