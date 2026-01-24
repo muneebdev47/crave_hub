@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Crave Hub Menu</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div id="sidebar-container"></div>
+
+        <!-- Main content -->
+        <main class="main-content">
+            <h1>Menu Management</h1>
+
+            <!-- CRUD Form -->
+            <div class="menu-form">
+                <input type="hidden" id="menu-id">
+                <input type="text" id="menu-name" placeholder="Item Name">
+                <input type="text" id="menu-category" placeholder="Category">
+                <input type="number" id="menu-price" placeholder="Price">
+                <button id="add-update-btn">Add Item</button>
+                <button id="clear-btn">Clear</button>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="menu-search-container">
+                <input type="text" id="menu-search" class="menu-search-input"
+                    placeholder="Search menu items by name or category...">
+            </div>
+
+            <!-- Cards Container -->
+            <div class="menu-cards" id="menu-cards"></div>
+        </main>
+    </div>
+
+    <!-- Qt WebChannel script - required for JavaScript-Python communication -->
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script src="js/layout.js"></script>
+    <script src="js/menu.js"></script>
+</body>
+
+</html>

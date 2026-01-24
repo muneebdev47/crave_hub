@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Crave Hub Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script src="js/chart.min.js"></script>
+    <script>
+        // Verify Chart.js is loaded immediately after script tag
+        (function () {
+            if (typeof Chart !== 'undefined') {
+                console.log('Chart.js loaded successfully, version:', Chart.version || 'loaded');
+            } else {
+                console.error('Chart.js failed to load from local file!');
+            }
+        })();
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <div id="sidebar-container"></div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <h1>Dashboard</h1>
+
+            <!-- KPI Cards -->
+            <div class="kpi-container">
+                <div class="kpi-card">
+                    <div>
+                        <span class="kpi-title">Today's Total Orders: </span>
+                        <span class="kpi-value">-</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div>
+                        <span class="kpi-title">Today's Completed Orders: </span>
+                        <span class="kpi-value">-</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div>
+                        <span class="kpi-title">Today's Cancelled Orders: </span>
+                        <span class="kpi-value">-</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div>
+                        <span class="kpi-title">Today's Total Revenue: </span>
+                        <span class="kpi-value">-</span>
+                    </div>
+                </div>
+            </div>
+            <div class="kpi-container">
+                <div class="kpi-card">
+                    <div>
+                        <span class="kpi-title">Total Orders: </span>
+                        <span class="kpi-value">-</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div>
+                        <span class="kpi-title">Monthly Orders: </span>
+                        <span class="kpi-value">-</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div>
+                        <span class="kpi-title">Top Item: </span>
+                        <span class="kpi-value">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts-container">
+                <div class="chart-card">
+                    <h3 style="margin-bottom: 10px; color: gray;">Daily Orders (This Month)</h3>
+                    <div style="position: relative; height: 350px; width: 100%; background-color: #121212;">
+                        <canvas id="monthlyOrdersChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3 style="margin-bottom: 10px; color: gray;">Daily Revenue (This Month)</h3>
+                    <div style="position: relative; height: 350px; width: 100%; background-color: #121212; ">
+                        <canvas id="monthlyRevenueChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Panels -->
+            <div class="bottom-panels">
+                <div class="panel">
+                    <h3>🧾 All Orders</h3>
+                    <div class="orders-table-container">
+                        <table class="orders-table">
+                            <thead>
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Type</th>
+                                    <th>Customer/Table</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Orders will be loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Edit Order Modal -->
+    <div id="orderModal" class="order-modal" style="display: none;">
+        <div class="order-modal-content">
+            <span class="close-modal" onclick="closeOrderModal()">&times;</span>
+            <h2 id="modalTitle">Order Details</h2>
+            <div id="modalContent">
+                <!-- Modal content will be populated by JS -->
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
+<script src="js/layout.js"></script>
+<script src="js/print_utils.js"></script>
+<script src="js/dashboard.js"></script>

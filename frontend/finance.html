@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Crave Hub - Finance</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script src="js/chart.min.js"></script>
+    <script>
+        // Verify Chart.js is loaded
+        (function () {
+            if (typeof Chart !== 'undefined') {
+                console.log('Chart.js loaded successfully');
+            } else {
+                console.error('Chart.js failed to load!');
+            }
+        })();
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div id="sidebar-container"></div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <h1>Finance Dashboard</h1>
+
+            <!-- Date Filter Section -->
+            <div class="finance-filters">
+                <div class="filter-group">
+                    <label for="dateFrom">From Date:</label>
+                    <input type="date" id="dateFrom" class="date-input">
+                </div>
+                <div class="filter-group">
+                    <label for="dateTo">To Date:</label>
+                    <input type="date" id="dateTo" class="date-input">
+                </div>
+                <button id="applyFilter" class="btn-filter">Apply Filter</button>
+                <button id="resetFilter" class="btn-reset">Reset</button>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="finance-stats-container">
+                <div class="stat-card">
+                    <h3>Total Orders</h3>
+                    <p class="stat-value" id="total-orders">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Revenue</h3>
+                    <p class="stat-value" id="total-revenue">Rs. 0.00</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Completed Orders</h3>
+                    <p class="stat-value" id="completed-orders">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Pending Orders</h3>
+                    <p class="stat-value" id="pending-orders">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Average Order Value</h3>
+                    <p class="stat-value" id="avg-order-value">Rs. 0.00</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Payments</h3>
+                    <p class="stat-value" id="total-payments">Rs. 0.00</p>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="charts-container">
+                <div class="chart-card">
+                    <h3>Revenue by Order Type</h3>
+                    <div style="position: relative; height: 350px; width: 100%;">
+                        <canvas id="revenueByTypeChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Orders by Status</h3>
+                    <div style="position: relative; height: 350px; width: 100%;">
+                        <canvas id="ordersByStatusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-container">
+                <div class="chart-card">
+                    <h3>Daily Revenue Trend</h3>
+                    <div style="position: relative; height: 350px; width: 100%;">
+                        <canvas id="dailyRevenueChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Daily Orders Trend</h3>
+                    <div style="position: relative; height: 350px; width: 100%;">
+                        <canvas id="dailyOrdersChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders Table -->
+            <div class="panel" style="margin-top: 20px;">
+                <h3>All Orders</h3>
+                <div class="orders-table-container">
+                    <table class="orders-table">
+                        <thead>
+                            <tr>
+                                <th>Order #</th>
+                                <th>Type</th>
+                                <th>Customer/Table</th>
+                                <th>Date & Time</th>
+                                <th>Total</th>
+                                <th>Order Status</th>
+                                <th>Payment Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table-body">
+                            <!-- Orders will be loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/layout.js"></script>
+    <script src="js/finance.js"></script>
+</body>
+
+</html>

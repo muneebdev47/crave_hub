@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Crave Hub - Takeaway Orders</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div id="sidebar-container"></div>
+
+        <!-- Main content -->
+        <main class="main-content">
+            <h1 style="color: white;">Takeaway Order</h1>
+
+            <!-- Customer Info -->
+            <div class="customer-info" style="margin-bottom: 20px;">
+                <label for="customerName" style="color: white; display: block; margin-bottom: 8px;">Customer
+                    Name:</label>
+                <input type="text" id="customerName" placeholder="Enter customer name"
+                    style="padding: 10px; width: 300px; border-radius: 6px; border: 1px solid #2A2A2A; background-color: #2A2A2A; color: white;">
+            </div>
+
+            <!-- Main Order Layout: Menu on Left, Order Summary on Right -->
+            <div class="takeaway-order-layout">
+                <!-- Left Side: Menu Items -->
+                <div class="takeaway-menu-section">
+                    <h3>Menu Items</h3>
+                    <input type="text" id="menuSearch" class="menu-search-input" placeholder="Search menu items...">
+                    <div class="menu-items-grid" id="menuItems">
+                        <!-- Menu items populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Right Side: Order Summary -->
+                <div class="takeaway-order-summary">
+                    <h3>Order Summary</h3>
+                    <div id="selectedItemsList" class="selected-items-list">
+                        <!-- Selected items will be populated by JS -->
+                    </div>
+                    <div class="order-total">
+                        <strong>Total: Rs. <span id="totalAmount">0.00</span></strong>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn-primary" id="placeOrderBtn">Place Order</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Takeaway Orders Table -->
+            <div class="takeaway-orders-table-section" style="margin-top: 40px;">
+                <h2 style="color: white; margin-bottom: 20px;">Takeaway Orders</h2>
+                <div class="orders-table-container">
+                    <table class="orders-table">
+                        <thead>
+                            <tr>
+                                <th>Order #</th>
+                                <th>Customer Name</th>
+                                <th>Date & Time</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="takeawayOrdersTableBody">
+                            <!-- Orders will be loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Edit Order Modal -->
+    <div id="orderModal" class="order-modal" style="display: none;">
+        <div class="order-modal-content">
+            <span class="close-modal" onclick="closeOrderModal()">&times;</span>
+            <h2 id="modalTitle">Edit Order</h2>
+            <div id="modalContent">
+                <!-- Modal content will be populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script src="js/layout.js"></script>
+    <script src="js/print_utils.js"></script>
+    <script src="js/takeaway_orders.js"></script>
+</body>
+
+</html>

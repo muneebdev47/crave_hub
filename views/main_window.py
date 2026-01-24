@@ -1,84 +1,58 @@
-from PyQt6.QtWidgets import (
-    QMainWindow,
-    QWidget,
-    QHBoxLayout,
-    QVBoxLayout,
-    QPushButton,
-    QStackedWidget,
-    QLabel,
-)
-from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QMainWindow, QLabel
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebChannel import QWebChannel
+from PyQt6.QtCore import QUrl, Qt
+from PyQt6.QtGui import QIcon, QPixmap
+import os
 from pathlib import Path
 
-from views.dashboard import DashboardView
-from views.user_view import UserView
-from views.menu_view import MenuView
-from views.order_view import OrderView
-from views.finance_view import FinanceView
+from controllers.menu_backend import MenuBackend
+from controllers.db_backend import DatabaseBackend
 
 
 class MainWindow(QMainWindow):
-    """
-    Main application window with left navbar
-    """
-
     def __init__(self):
         super().__init__()
+        self.setWindowTitle("CraveHub Cafe")
+        self.setMinimumSize(1500, 1000)
 
-        BASE_DIR = Path(__file__).resolve().parent.parent
-        self.setWindowTitle("Crave Hub")
-        self.resize(1200, 800)
-        self.setWindowIcon(QIcon(str(BASE_DIR / "assets" / "logo.png")))
+        # Set window icon (logo)
+        base_dir = Path(__file__).resolve().parent.parent
+        logo_path = base_dir / "assets" / "logo.png"
+        if logo_path.exists():
+            self.setWindowIcon(QIcon(str(logo_path)))
 
-        self._build_ui()
+        # Set up status bar with footer
+        status_bar = self.statusBar()
+        footer_label = QLabel("Developed by Muneeb 03256000110")
+        footer_label.setStyleSheet("color: #888; padding: 5px;")
+        status_bar.addPermanentWidget(footer_label)
+        status_bar.setStyleSheet("background-color: #1A1A1A; color: #888;")
 
-    def _build_ui(self):
-        root = QWidget()
-        root_layout = QHBoxLayout()
-        root_layout.setContentsMargins(0, 0, 0, 0)
+        self.web = QWebEngineView()
+        self.setCentralWidget(self.web)
 
-        # -------- Sidebar --------
-        sidebar = QWidget()
-        sidebar.setObjectName("Sidebar")
-        sidebar_layout = QVBoxLayout()
-        sidebar_layout.setSpacing(10)
+        # Set up WebChannel for JavaScript-Python communication
+        self.channel = QWebChannel()
+        self.menu_backend = MenuBackend()
+        self.db_backend = DatabaseBackend()
 
-        title = QLabel("🍕 Crave Hub")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        # Register backend objects
+        self.channel.registerObject("menuBackend", self.menu_backend)
+        self.channel.registerObject("dbBackend", self.db_backend)
 
-        btn_dashboard = self._nav_button("Dashboard", 0)
-        btn_users = self._nav_button("Users", 1)
-        btn_menu = self._nav_button("Menu", 2)
-        btn_orders = self._nav_button("Orders", 3)
-        btn_finance = self._nav_button("Finance", 4)
+        # Set WebChannel on the page
+        self.web.page().setWebChannel(self.channel)
 
-        sidebar_layout.addWidget(title)
-        sidebar_layout.addWidget(btn_dashboard)
-        sidebar_layout.addWidget(btn_users)
-        sidebar_layout.addWidget(btn_menu)
-        sidebar_layout.addWidget(btn_orders)
-        sidebar_layout.addWidget(btn_finance)
-        sidebar_layout.addStretch()
+        # Load login page by default
+        html_path = os.path.abspath("frontend/login.html")
 
-        sidebar.setLayout(sidebar_layout)
-        sidebar.setFixedWidth(200)
+        # Read the HTML content
+        with open(html_path, "r", encoding="utf-8") as f:
+            html_content = f.read()
 
-        # -------- Pages --------
-        self.pages = QStackedWidget()
-        self.pages.addWidget(DashboardView())
-        self.pages.addWidget(UserView())
-        self.pages.addWidget(MenuView())
-        self.pages.addWidget(OrderView())
-        self.pages.addWidget(FinanceView())
+        # Base URL points to the folder containing the HTML file
+        base_url = QUrl.fromLocalFile(os.path.dirname(html_path) + os.sep)
 
-        root_layout.addWidget(sidebar)
-        root_layout.addWidget(self.pages)
-
-        root.setLayout(root_layout)
-        self.setCentralWidget(root)
-
-    def _nav_button(self, text, index):
-        btn = QPushButton(text)
-        btn.setObjectName("NavButton")
-        btn.clicked.connect(lambda: self.pages.setCurrentIndex(index))
-        return btn
+        # Load HTML content with base URL
+        self.web.setHtml(html_content, base_url)

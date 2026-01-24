@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Crave Hub - Table Orders</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <div id="sidebar-container"></div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <h1>Table Orders</h1>
+
+            <div class="tables-container" id="tables-container">
+                <!-- Table boxes will be injected by JS -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Order Modal -->
+    <div id="orderModal" class="order-modal">
+        <div class="order-modal-content">
+            <div class="order-modal-header">
+                <h2 id="modalTitle">Table Order</h2>
+                <span class="close-modal" onclick="closeOrderModal()">&times;</span>
+            </div>
+            <div id="modalContent" class="order-modal-body">
+                <!-- Content will be injected by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- JS -->
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script src="js/layout.js"></script> <!-- loads sidebar -->
+    <script src="js/print_utils.js"></script>
+    <script src="js/table_orders.js"></script>
+</body>
+
+</html>

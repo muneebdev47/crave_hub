@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Crave Hub - User Management</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div id="sidebar-container"></div>
+
+        <!-- Main content -->
+        <main class="main-content">
+            <h1>User Management</h1>
+
+            <!-- Create User Form -->
+            <div class="user-form">
+                <input type="hidden" id="user-id">
+                <input type="text" id="user-username" placeholder="Username" required>
+                <input type="password" id="user-password" placeholder="Password" required>
+                <select id="user-role">
+                    <option value="admin">Admin</option>
+                    <option value="staff">Staff</option>
+                    <option value="cashier">Cashier</option>
+                </select>
+                <button id="add-update-btn">Add User</button>
+                <button id="clear-btn">Clear</button>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="user-search-container">
+                <input type="text" id="user-search" class="user-search-input" placeholder="Search users by username or role...">
+            </div>
+
+            <!-- Users Cards Container -->
+            <div class="users-cards" id="users-cards"></div>
+        </main>
+    </div>
+
+    <!-- Module Access Modal -->
+    <div id="moduleAccessModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="moduleModalTitle">Module Access</h2>
+                <span class="close-modal" onclick="closeModuleModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="moduleModalUser"></p>
+                <div class="module-access-list" id="moduleAccessList">
+                    <!-- Module checkboxes will be injected here -->
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-secondary" onclick="closeModuleModal()">Cancel</button>
+                    <button class="btn-primary" onclick="saveModuleAccess()">Save Access</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Qt WebChannel script - required for JavaScript-Python communication -->
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script src="js/layout.js"></script>
+    <script src="js/users.js"></script>
+</body>
+
+</html>
