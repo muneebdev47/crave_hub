@@ -824,13 +824,36 @@ async function markOrderComplete() {
 
         // Show invoice print popup
         if (confirm("Order marked as complete! Would you like to print the invoice?")) {
-            if (typeof printInvoice === 'function') {
-                await printInvoice(currentOrderId, dbBackend);
-            } else {
-                const script = document.createElement('script');
-                script.src = 'js/print_utils.js';
-                script.onload = () => printInvoice(currentOrderId, dbBackend);
-                document.head.appendChild(script);
+            try {
+                // Ensure printInvoice is available
+                if (typeof window.printInvoice === 'function') {
+                    console.log("Calling printInvoice for order:", currentOrderId);
+                    await window.printInvoice(currentOrderId, dbBackend);
+                } else if (typeof printInvoice === 'function') {
+                    console.log("Calling printInvoice (global) for order:", currentOrderId);
+                    await printInvoice(currentOrderId, dbBackend);
+                } else {
+                    console.warn("printInvoice not found, loading print_utils.js");
+                    // Dynamically load print_utils.js if not already loaded
+                    const script = document.createElement('script');
+                    script.src = 'js/print_utils.js';
+                    script.onload = async () => {
+                        console.log("print_utils.js loaded, calling printInvoice");
+                        if (typeof window.printInvoice === 'function') {
+                            await window.printInvoice(currentOrderId, dbBackend);
+                        } else {
+                            alert("Error: printInvoice function not available after loading script");
+                        }
+                    };
+                    script.onerror = () => {
+                        alert("Error loading print utilities. Please check the console for details.");
+                        console.error("Failed to load print_utils.js");
+                    };
+                    document.head.appendChild(script);
+                }
+            } catch (error) {
+                console.error("Error printing invoice:", error);
+                alert("Error printing invoice: " + error.message);
             }
         }
 
