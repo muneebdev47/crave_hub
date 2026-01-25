@@ -14,7 +14,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CraveHub Cafe")
-        self.setMinimumSize(1500, 1000)
+        # self.setMinimumSize(700, 500)
+        self.showMaximized()
+
 
         # Set window icon (logo)
         base_dir = Path(__file__).resolve().parent.parent
