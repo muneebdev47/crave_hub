@@ -185,23 +185,129 @@ async function printOrderReceipt(orderId, dbBackend) {
 
     const receiptText = generateReceiptText(orders[0], items);
 
-    if (!window.printerBackend) {
-        if (typeof showAlertModal === 'function') await showAlertModal("Printer backend not available. Restart app.");
-        else alert("Printer backend not available. Restart app.");
+    // Wait for printer backend to be available (up to 5 seconds)
+    let printerBackend = window.printerBackend;
+    console.log(`[PRINT] Checking printer backend... Available: ${!!printerBackend}, WebChannel initialized: ${!!window._webChannelInitialized}`);
+    
+    // If not available, wait for WebChannel to initialize first
+    if (!printerBackend || !window._webChannelInitialized) {
+        console.log("[PRINT] Printer backend or WebChannel not ready, waiting...");
+        
+        // First, wait for WebChannel to be initialized (up to 5 seconds)
+        if (!window._webChannelInitialized) {
+            console.log("[PRINT] Waiting for WebChannel initialization...");
+            let webChannelReady = false;
+            
+            // Check if already initialized
+            if (window._webChannelInitialized) {
+                webChannelReady = true;
+            } else {
+                // Wait for the event or timeout
+                await new Promise((resolve) => {
+                    const checkInterval = setInterval(() => {
+                        if (window._webChannelInitialized) {
+                            clearInterval(checkInterval);
+                            webChannelReady = true;
+                            console.log("[PRINT] WebChannel initialized detected");
+                            resolve();
+                        }
+                    }, 100);
+                    
+                    // Listen for the event
+                    window.addEventListener('webchannel-ready', () => {
+                        clearInterval(checkInterval);
+                        webChannelReady = true;
+                        console.log("[PRINT] WebChannel ready event received");
+                        resolve();
+                    }, { once: true });
+                    
+                    // Timeout after 5 seconds
+                    setTimeout(() => {
+                        clearInterval(checkInterval);
+                        console.log("[PRINT] WebChannel wait timeout after 5 seconds");
+                        resolve();
+                    }, 5000);
+                });
+            }
+        }
+        
+        // Now wait for printer backend to be available (up to 3 more seconds)
+        if (!printerBackend) {
+            console.log("[PRINT] Waiting for printer backend to be available...");
+            for (let i = 0; i < 30; i++) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                printerBackend = window.printerBackend;
+                
+                // Also try to get it from channel objects if available
+                if (!printerBackend && typeof qt !== 'undefined' && qt.webChannelTransport) {
+                    try {
+                        // Try to access through QWebChannel if it exists
+                        if (typeof QWebChannel !== 'undefined') {
+                            // Check if we can access the channel
+                            console.log("[PRINT] Attempting to access printer backend through WebChannel...");
+                        }
+                    } catch (e) {
+                        console.log("[PRINT] Could not access WebChannel directly:", e);
+                    }
+                }
+                
+                if (printerBackend) {
+                    console.log(`[PRINT] Printer backend available after ${(i + 1) * 100}ms`);
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!printerBackend) {
+        console.error("[PRINT] ERROR: Printer backend still not available after waiting");
+        console.error("[PRINT] window.printerBackend:", window.printerBackend);
+        console.error("[PRINT] window._webChannelInitialized:", window._webChannelInitialized);
+        console.error("[PRINT] typeof qt:", typeof qt);
+        console.error("[PRINT] typeof QWebChannel:", typeof QWebChannel);
+        
+        // Try one more time to get printer backend - check if WebChannel exists but printerBackend wasn't set
+        if (!printerBackend && typeof QWebChannel !== 'undefined' && typeof qt !== 'undefined' && qt.webChannelTransport) {
+            console.log("[PRINT] WebChannel transport available but printerBackend not set, checking...");
+            // Don't re-initialize, just wait a bit more and check again
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            printerBackend = window.printerBackend;
+            
+            if (printerBackend) {
+                console.log("[PRINT] Printer backend found after additional wait");
+            }
+        }
+        
+        if (!printerBackend) {
+            const errorMsg = "Printer backend not available. Please:\n1. Restart the application\n2. Check terminal for printer initialization messages\n3. Ensure the printer is connected";
+            if (typeof showAlertModal === 'function') await showAlertModal(errorMsg);
+            else alert(errorMsg);
+            return;
+        }
+    }
+    
+    console.log("[PRINT] Printer backend confirmed available, proceeding with print...");
+
+    if (typeof printerBackend.print_receipt !== 'function') {
+        const errorMsg = "Printer method not available. Please restart the application.";
+        if (typeof showAlertModal === 'function') await showAlertModal(errorMsg);
+        else alert(errorMsg);
         return;
     }
 
-    let result = window.printerBackend.print_receipt(receiptText);
-    if (result && typeof result.then === 'function') result = await result;
-
     try {
+        let result = printerBackend.print_receipt(receiptText);
+        if (result && typeof result.then === 'function') result = await result;
+
         const res = JSON.parse(result);
         if (!res.success) throw new Error(res.error);
         if (typeof showAlertModal === 'function') await showAlertModal("Receipt printed successfully!");
         else alert("Receipt printed successfully!");
     } catch (e) {
-        if (typeof showAlertModal === 'function') await showAlertModal("Printer error: " + e.message);
-        else alert("Printer error: " + e.message);
+        console.error("[PRINT] Error:", e);
+        const errorMsg = "Printer error: " + (e.message || String(e));
+        if (typeof showAlertModal === 'function') await showAlertModal(errorMsg);
+        else alert(errorMsg);
     }
 }
 

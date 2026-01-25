@@ -163,7 +163,12 @@ async function loadChartData(dateFilter) {
                 COUNT(*) as count
             FROM orders
             WHERE 1=1 ${dateFilter}
-            GROUP BY status
+            GROUP BY 
+                CASE 
+                    WHEN order_status = 'completed' THEN 'Completed'
+                    WHEN order_status = 'pending' OR order_status IS NULL THEN 'Pending'
+                    ELSE 'Other'
+                END
         `;
         const ordersByStatusData = await safeDbQuery(ordersByStatusSql);
 
@@ -305,6 +310,17 @@ function renderOrdersByStatusChart(data) {
                         color: '#333',
                         font: {
                             size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return `${label}: ${value} order${value !== 1 ? 's' : ''} (${percentage}%)`;
                         }
                     }
                 }

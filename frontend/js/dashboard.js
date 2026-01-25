@@ -97,50 +97,24 @@ async function safeDbUpdate(sql, params) {
     }
 }
 
-// Initialize Qt WebChannel
-function initWebChannel() {
-    if (typeof QWebChannel === 'undefined') {
-        console.log("Waiting for QWebChannel to load...");
-        setTimeout(initWebChannel, 100);
-        return;
-    }
-
-    if (typeof qt !== 'undefined' && qt.webChannelTransport) {
-        try {
-            console.log("Initializing WebChannel...");
-            new QWebChannel(qt.webChannelTransport, function (channel) {
-                console.log("WebChannel connected!", channel.objects);
-                window.dbBackend = channel.objects.dbBackend;
-                dbBackend = channel.objects.dbBackend;
-
-                if (dbBackend) {
-                    console.log("Database backend initialized successfully!");
-                    // Load menu items for order editing (async, don't wait)
-                    setTimeout(() => { if (typeof loadMenuItems === 'function') { loadMenuItems(); } else { setTimeout(() => { if (typeof loadMenuItems === 'function') { loadMenuItems(); } }, 500); } }, 100);
-                    // Test database connection
-                    const testQuery = "SELECT 1 as test";
-                    const testResult = dbBackend.execute_query(testQuery);
-                    // Handle Promise if returned
-                    if (testResult && typeof testResult.then === 'function') {
-                        testResult.then(result => {
-                            console.log("Database test query result:", result);
-                        }).catch(err => {
-                            console.error("Database test query error:", err);
-                        });
-                    } else {
-                        console.log("Database test query result:", testResult);
-                    }
-                } else {
-                    console.error("Database backend not found in channel objects");
-                }
-
-                loadDashboardData();
-            });
-        } catch (error) {
-            console.error("Error initializing WebChannel:", error);
-        }
+// Wait for global WebChannel to be initialized (from webchannel.js)
+function waitForWebChannel() {
+    if (window._webChannelInitialized && window.dbBackend) {
+        // WebChannel is ready, assign to local variable
+        dbBackend = window.dbBackend;
+        console.log("[DASHBOARD] WebChannel ready, loading data...");
+        // Load menu items for order editing
+        setTimeout(() => { 
+            if (typeof loadMenuItems === 'function') { 
+                loadMenuItems(); 
+            } 
+        }, 100);
+        // Load dashboard data
+        loadDashboardData();
     } else {
-        console.warn("Qt WebChannel not available. qt:", typeof qt, "webChannelTransport:", typeof qt?.webChannelTransport);
+        // Wait for WebChannel initialization
+        console.log("[DASHBOARD] Waiting for WebChannel...");
+        setTimeout(waitForWebChannel, 100);
     }
 }
 
@@ -574,8 +548,19 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Initialize WebChannel
-    initWebChannel();
+    // Wait for global WebChannel to be initialized
+    waitForWebChannel();
+    
+    // Also listen for the webchannel-ready event as a backup
+    window.addEventListener('webchannel-ready', () => {
+        if (window.dbBackend) {
+            dbBackend = window.dbBackend;
+            if (typeof loadMenuItems === 'function') {
+                loadMenuItems();
+            }
+            loadDashboardData();
+        }
+    });
 });
 
 // Load menu items from database
@@ -922,9 +907,18 @@ async function updateOrder() {
 
 // Toggle order status (pending <-> completed)
 async function toggleOrderStatus() {
-    if (!currentOrderId || !dbBackend) {
-        alert("Invalid order or database not initialized");
+    if (!currentOrderId || !(window.dbBackend || dbBackend)) {
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Invalid order or database not initialized");
+        } else {
+            alert("Invalid order or database not initialized");
+        }
         return;
+    }
+    
+    // Ensure dbBackend is set
+    if (!dbBackend && window.dbBackend) {
+        dbBackend = window.dbBackend;
     }
 
     try {
@@ -957,25 +951,44 @@ async function toggleOrderStatus() {
             const paymentSql = `INSERT INTO payment_transactions (order_id, amount, payment_method, payment_status, created_at) VALUES (?, ?, ?, ?, ?)`;
             await safeDbUpdate(paymentSql, [currentOrderId, orderTotal, 'cash', 'completed', now]);
 
+            // Always ask: thermal receipt (same as place order) - simple and quick like other pages
             const wantPrint = await showConfirmModal("Order marked as complete! Would you like to print the receipt? (You can print more copies anytime.)");
             if (wantPrint) {
                 try {
+                    // Use the same simple approach as takeaway/delivery/table orders
                     if (typeof printOrderReceipt === 'function') {
                         await printOrderReceipt(currentOrderId, dbBackend);
                     } else {
+                        // Load print_utils.js if not already loaded
                         const script = document.createElement('script');
                         script.src = 'js/print_utils.js';
                         script.onload = async () => {
                             if (typeof printOrderReceipt === 'function') {
                                 await printOrderReceipt(currentOrderId, dbBackend);
-                            } else alert("Error: Print function not available");
+                            } else {
+                                if (typeof showAlertModal === 'function') {
+                                    await showAlertModal("Error: Print function not available");
+                                } else {
+                                    alert("Error: Print function not available");
+                                }
+                            }
                         };
-                        script.onerror = () => alert("Error loading print utilities");
+                        script.onerror = async () => {
+                            if (typeof showAlertModal === 'function') {
+                                await showAlertModal("Error loading print utilities");
+                            } else {
+                                alert("Error loading print utilities");
+                            }
+                        };
                         document.head.appendChild(script);
                     }
-                } catch (e) {
-                    console.error("[DASHBOARD] Error printing receipt:", e);
-                    alert("Error printing receipt: " + e.message);
+                } catch (error) {
+                    console.error("[DASHBOARD] Error printing receipt:", error);
+                    if (typeof showAlertModal === 'function') {
+                        await showAlertModal("Error printing receipt: " + error.message);
+                    } else {
+                        alert("Error printing receipt: " + error.message);
+                    }
                 }
             }
         }
@@ -1003,7 +1016,11 @@ async function toggleOrderStatus() {
         // (This will be handled by the table orders page when it's loaded)
     } catch (error) {
         console.error("Error toggling order status:", error);
-        alert("Error changing order status: " + error.message);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error changing order status: " + error.message);
+        } else {
+            alert("Error changing order status: " + error.message);
+        }
     }
 }
 

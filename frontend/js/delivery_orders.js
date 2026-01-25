@@ -269,7 +269,11 @@ function decreaseQuantity(menuItemId) {
 // Save order
 async function saveOrder(orderType, total) {
     if (!(window.dbBackend || dbBackend)) {
-        alert("Database not initialized");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Database not initialized");
+        } else {
+            alert("Database not initialized");
+        }
         return;
     }
 
@@ -283,7 +287,11 @@ async function saveOrder(orderType, total) {
         console.log("Order insert result:", result);
 
         if (!result || result.success === false) {
-            alert("Error saving order: " + (result?.error || "Unknown error"));
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Error saving order: " + (result?.error || "Unknown error"));
+            } else {
+                alert("Error saving order: " + (result?.error || "Unknown error"));
+            }
             return;
         }
 
@@ -304,11 +312,19 @@ async function saveOrder(orderType, total) {
                 if (!isNaN(fallbackOrderId) && fallbackOrderId > 0) {
                     orderId = fallbackOrderId;
                 } else {
-                    alert("Error getting order ID. Please check console for details.");
+                    if (typeof showAlertModal === 'function') {
+                        await showAlertModal("Error getting order ID. Please check console for details.");
+                    } else {
+                        alert("Error getting order ID. Please check console for details.");
+                    }
                     return;
                 }
             } else {
-                alert("Error getting order ID. Please check console for details.");
+                if (typeof showAlertModal === 'function') {
+                    await showAlertModal("Error getting order ID. Please check console for details.");
+                } else {
+                    alert("Error getting order ID. Please check console for details.");
+                }
                 return;
             }
         }
@@ -327,14 +343,30 @@ async function saveOrder(orderType, total) {
                     script.onload = async () => {
                         if (typeof printOrderReceipt === 'function') {
                             await printOrderReceipt(orderId, dbBackend);
-                        } else alert("Error: Print function not available");
+                        } else {
+                            if (typeof showAlertModal === 'function') {
+                                await showAlertModal("Error: Print function not available");
+                            } else {
+                                alert("Error: Print function not available");
+                            }
+                        }
                     };
-                    script.onerror = () => alert("Error loading print utilities");
+                    script.onerror = async () => {
+                        if (typeof showAlertModal === 'function') {
+                            await showAlertModal("Error loading print utilities");
+                        } else {
+                            alert("Error loading print utilities");
+                        }
+                    };
                     document.head.appendChild(script);
                 }
             } catch (error) {
                 console.error("[DELIVERY] Error printing receipt:", error);
-                alert("Error printing receipt: " + error.message);
+                if (typeof showAlertModal === 'function') {
+                    await showAlertModal("Error printing receipt: " + error.message);
+                } else {
+                    alert("Error printing receipt: " + error.message);
+                }
             }
         }
 
@@ -347,7 +379,11 @@ async function saveOrder(orderType, total) {
         loadDeliveryOrders();
     } catch (error) {
         console.error("Error saving order:", error);
-        alert("Error saving order: " + error.message);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error saving order: " + error.message);
+        } else {
+            alert("Error saving order: " + error.message);
+        }
     }
 }
 
@@ -456,7 +492,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // Place order
     placeOrderBtn.addEventListener("click", async () => {
         if (!(window.dbBackend || dbBackend)) {
-            alert("Database backend not initialized. Please wait...");
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Database backend not initialized. Please wait...");
+            } else {
+                alert("Database backend not initialized. Please wait...");
+            }
             return;
         }
 
@@ -464,17 +504,33 @@ document.addEventListener("DOMContentLoaded", () => {
         const customerPhone = customerPhoneInput.value.trim();
 
         if (!customerName) {
-            alert("Please enter customer name");
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Please enter customer name");
+            } else {
+                alert("Please enter customer name");
+            }
             return;
         }
 
         if (!customerPhone) {
-            alert("Please enter phone number");
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Please enter phone number");
+            } else {
+                alert("Please enter phone number");
+            }
             return;
         }
 
         if (Object.keys(selectedItems).length === 0) {
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Please select at least one item");
+            } else {
+                if (typeof showAlertModal === 'function') {
+            await showAlertModal("Please select at least one item");
+        } else {
             alert("Please select at least one item");
+        }
+            }
             return;
         }
 
@@ -514,7 +570,11 @@ async function openEditOrderModal(orderId) {
     const orderSql = `SELECT * FROM orders WHERE id = ?`;
     const orders = await safeDbQuery(orderSql, [orderId]);
     if (!orders || orders.length === 0) {
-        alert("Order not found");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Order not found");
+        } else {
+            alert("Order not found");
+        }
         return;
     }
     const order = orders[0];
@@ -735,12 +795,20 @@ function closeOrderModal() {
 // Update existing order
 async function updateOrder() {
     if (Object.keys(selectedItems).length === 0) {
-        alert("Please select at least one item");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Please select at least one item");
+        } else {
+            alert("Please select at least one item");
+        }
         return;
     }
 
     if (!currentOrderId || !dbBackend) {
-        alert("Invalid order or database not initialized");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Invalid order or database not initialized");
+        } else {
+            alert("Invalid order or database not initialized");
+        }
         return;
     }
 
@@ -770,19 +838,31 @@ async function updateOrder() {
             await safeDbUpdate(insertItemSql, [currentOrderId, item.id, item.qty, item.price]);
         }
 
-        alert("Order updated successfully!");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Order updated successfully!");
+        } else {
+            alert("Order updated successfully!");
+        }
         closeOrderModal();
         loadDeliveryOrders();
     } catch (error) {
         console.error("Error updating order:", error);
-        alert("Error updating order: " + error.message);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error updating order: " + error.message);
+        } else {
+            alert("Error updating order: " + error.message);
+        }
     }
 }
 
 // Mark order as complete
 async function markOrderComplete() {
     if (!currentOrderId || !(window.dbBackend || dbBackend)) {
-        alert("Invalid order or database not initialized");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Invalid order or database not initialized");
+        } else {
+            alert("Invalid order or database not initialized");
+        }
         return;
     }
 
@@ -795,7 +875,11 @@ async function markOrderComplete() {
         const orderSql = `SELECT total FROM orders WHERE id = ?`;
         const orders = await safeDbQuery(orderSql, [currentOrderId]);
         if (!orders || orders.length === 0) {
+            if (typeof showAlertModal === 'function') {
+            await showAlertModal("Order not found");
+        } else {
             alert("Order not found");
+        }
             return;
         }
         const orderTotal = orders[0].total;
@@ -819,14 +903,30 @@ async function markOrderComplete() {
                     script.onload = async () => {
                         if (typeof printOrderReceipt === 'function') {
                             await printOrderReceipt(currentOrderId, dbBackend);
-                        } else alert("Error: Print function not available");
+                        } else {
+                            if (typeof showAlertModal === 'function') {
+                                await showAlertModal("Error: Print function not available");
+                            } else {
+                                alert("Error: Print function not available");
+                            }
+                        }
                     };
-                    script.onerror = () => alert("Error loading print utilities");
+                    script.onerror = async () => {
+                        if (typeof showAlertModal === 'function') {
+                            await showAlertModal("Error loading print utilities");
+                        } else {
+                            alert("Error loading print utilities");
+                        }
+                    };
                     document.head.appendChild(script);
                 }
             } catch (error) {
                 console.error("[DELIVERY] Error printing receipt:", error);
-                alert("Error printing receipt: " + error.message);
+                if (typeof showAlertModal === 'function') {
+                    await showAlertModal("Error printing receipt: " + error.message);
+                } else {
+                    alert("Error printing receipt: " + error.message);
+                }
             }
         }
 
@@ -834,7 +934,11 @@ async function markOrderComplete() {
         loadDeliveryOrders();
     } catch (error) {
         console.error("Error marking order complete:", error);
-        alert("Error marking order complete: " + error.message);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error marking order complete: " + error.message);
+        } else {
+            alert("Error marking order complete: " + error.message);
+        }
     }
 }
 
