@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Thermal Printer Test - CraveHub</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .test-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 30px;
+            background: #1A1A1A;
+            border-radius: 10px;
+        }
+        .test-title {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+        .test-button {
+            display: block;
+            width: 100%;
+            padding: 20px;
+            margin: 15px 0;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .test-button:hover {
+            background: #45a049;
+        }
+        .test-button.secondary {
+            background: #2196F3;
+        }
+        .test-button.secondary:hover {
+            background: #0b7dda;
+        }
+        .instructions {
+            background: #2A2A2A;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+            color: #ccc;
+        }
+        .instructions h3 {
+            color: white;
+            margin-bottom: 15px;
+        }
+        .instructions ol {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+        .instructions li {
+            margin-bottom: 10px;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #2A2A2A;
+            border-radius: 8px;
+            color: #4CAF50;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1 class="test-title">🧾 Thermal Receipt Printer Test</h1>
+        
+        <button class="test-button" onclick="testPrinter()">
+            🖨️ Print Test Receipt
+        </button>
+        
+        <button class="test-button secondary" onclick="testWithOrder()">
+            📋 Test with Real Order
+        </button>
+        
+        <div class="instructions">
+            <h3>📝 Instructions:</h3>
+            <ol>
+                <li><strong>Make sure your thermal printer is connected</strong> and turned on</li>
+                <li><strong>Click "Print Test Receipt"</strong> to print a sample receipt</li>
+                <li><strong>In the print dialog:</strong>
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>Select your thermal printer from the printer list</li>
+                        <li>Set paper size to <strong>80mm (3 inches)</strong> or <strong>Custom 80mm x auto</strong></li>
+                        <li>Set margins to <strong>Minimum</strong> or <strong>None</strong></li>
+                        <li>Click <strong>Print</strong></li>
+                    </ul>
+                </li>
+                <li><strong>Check the printed receipt:</strong>
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>Text should be clear and readable</li>
+                        <li>Content should fit within 80mm width</li>
+                        <li>No text should be cut off</li>
+                    </ul>
+                </li>
+                <li><strong>If printing works:</strong> You can now use the normal receipt/invoice printing in the app</li>
+            </ol>
+        </div>
+        
+        <div id="status" class="status" style="display: none;"></div>
+    </div>
+
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script src="js/print_utils.js" onerror="console.error('[TEST] Failed to load print_utils.js'); showStatus('❌ Failed to load print utilities', 'red');"></script>
+    <script>
+        let dbBackend = null;
+        
+        // Initialize WebChannel with retry logic
+        function initWebChannel() {
+            if (typeof QWebChannel === 'undefined') {
+                console.log("[TEST] Waiting for QWebChannel to load...");
+                setTimeout(initWebChannel, 100);
+                return;
+            }
+
+            if (typeof qt !== 'undefined' && qt.webChannelTransport) {
+                try {
+                    console.log("[TEST] Initializing WebChannel...");
+                    new QWebChannel(qt.webChannelTransport, function (channel) {
+                        if (!channel || !channel.objects) {
+                            console.error("[TEST] Invalid WebChannel or objects");
+                            showStatus("⚠️ WebChannel initialization failed. Retrying...", "orange");
+                            setTimeout(initWebChannel, 500);
+                            return;
+                        }
+
+                        if (!channel.objects.dbBackend) {
+                            console.error("[TEST] dbBackend not found in channel.objects");
+                            showStatus("⚠️ Database backend not found. Retrying...", "orange");
+                            setTimeout(initWebChannel, 500);
+                            return;
+                        }
+
+                        dbBackend = channel.objects.dbBackend;
+                        window.dbBackend = dbBackend;
+                        console.log("[TEST] Database backend initialized successfully");
+                        showStatus("✅ Ready to test printer", "green");
+                    });
+                } catch (error) {
+                    console.error("[TEST] Error initializing WebChannel:", error);
+                    showStatus("⚠️ WebChannel error. Retrying...", "orange");
+                    setTimeout(initWebChannel, 500);
+                }
+            } else {
+                console.warn("[TEST] Qt WebChannel not available. qt:", typeof qt, "webChannelTransport:", typeof qt?.webChannelTransport);
+                showStatus("⚠️ WebChannel not available. Retrying...", "orange");
+                setTimeout(initWebChannel, 500);
+            }
+        }
+        
+        // Start initialization when page loads
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log("[TEST] Page loaded, initializing...");
+            
+            // Check if print_utils.js loaded
+            setTimeout(() => {
+                if (typeof window.printOrderReceipt === 'function' || typeof window.testThermalPrinter === 'function') {
+                    console.log("[TEST] Print utilities loaded successfully");
+                } else {
+                    console.warn("[TEST] Print utilities not found after load");
+                    showStatus("⚠️ Waiting for print utilities to load...", "orange");
+                }
+            }, 500);
+            
+            initWebChannel();
+        });
+        
+        let isPrinting = false;
+        
+        function testPrinter() {
+            // Prevent multiple simultaneous print calls
+            if (isPrinting) {
+                showStatus("⏳ Print dialog already open. Please wait...", "orange");
+                return;
+            }
+            
+            isPrinting = true;
+            console.log("[TEST] Testing thermal printer...");
+            showStatus("🖨️ Opening print dialog...", "blue");
+            
+            // Check if function exists, with retry
+            if (typeof window.testThermalPrinter === 'function') {
+                window.testThermalPrinter();
+                showStatus("✅ Print dialog opened. Select your thermal printer and click Print.", "green");
+                
+                // Reset flag after a delay
+                setTimeout(() => {
+                    isPrinting = false;
+                }, 3000);
+            } else if (typeof testThermalPrinter === 'function') {
+                testThermalPrinter();
+                showStatus("✅ Print dialog opened. Select your thermal printer and click Print.", "green");
+                
+                // Reset flag after a delay
+                setTimeout(() => {
+                    isPrinting = false;
+                }, 3000);
+            } else {
+                console.error("[TEST] testThermalPrinter function not found");
+                console.log("[TEST] Available functions:", Object.keys(window).filter(k => k.includes('print') || k.includes('test')));
+                showStatus("❌ Print utilities not loaded. Waiting for scripts...", "orange");
+                
+                // Wait a bit and retry
+                setTimeout(() => {
+                    if (typeof window.testThermalPrinter === 'function' || typeof testThermalPrinter === 'function') {
+                        testPrinter(); // Retry
+                    } else {
+                        showStatus("❌ Print utilities failed to load. Please refresh the page.", "red");
+                        isPrinting = false;
+                    }
+                }, 1000);
+            }
+        }
+        
+        async function testWithOrder() {
+            // Prevent multiple simultaneous print calls
+            if (isPrinting) {
+                showStatus("⏳ Print dialog already open. Please wait...", "orange");
+                return;
+            }
+            
+            if (!dbBackend) {
+                showStatus("❌ Database not initialized. Please refresh the page.", "red");
+                return;
+            }
+            
+            isPrinting = true;
+            
+            try {
+                // Get the first order from database
+                const sql = "SELECT id FROM orders ORDER BY id DESC LIMIT 1";
+                const response = dbBackend.execute_query(sql);
+                const result = await (response && typeof response.then === 'function' ? response : Promise.resolve(response));
+                const orders = JSON.parse(result || "[]");
+                
+                if (orders && orders.length > 0) {
+                    const orderId = orders[0].id;
+                    showStatus(`🖨️ Printing receipt for Order #${orderId}...`, "blue");
+                    
+                    if (typeof printOrderReceipt === 'function') {
+                        await printOrderReceipt(orderId, dbBackend);
+                        showStatus(`✅ Receipt for Order #${orderId} sent to printer!`, "green");
+                    } else {
+                        showStatus("❌ Print function not available", "red");
+                    }
+                } else {
+                    showStatus("❌ No orders found. Please create an order first.", "orange");
+                }
+            } catch (error) {
+                console.error("[TEST] Error testing with order:", error);
+                showStatus("❌ Error: " + error.message, "red");
+            } finally {
+                // Reset flag after a delay
+                setTimeout(() => {
+                    isPrinting = false;
+                }, 3000);
+            }
+        }
+        
+        function showStatus(message, color) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.style.display = 'block';
+            statusEl.style.color = color === 'green' ? '#4CAF50' : 
+                                   color === 'red' ? '#f44336' : 
+                                   color === 'orange' ? '#ff9800' : '#2196F3';
+        }
+    </script>
+</body>
+</html>

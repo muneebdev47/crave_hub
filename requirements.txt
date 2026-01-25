@@ -12,3 +12,5 @@ PyQt6-WebEngine-Qt6==6.10.1
 PyQt6_sip==13.11.0
 pywin32-ctypes==0.2.3
 setuptools==80.10.1
+python-escpos>=3.0.0
+pyusb>=1.2.0

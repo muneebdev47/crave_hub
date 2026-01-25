@@ -1,4 +1,5 @@
-let dbBackend = null;
+// dbBackend is initialized globally by webchannel.js
+// Use window.dbBackend or the global dbBackend variable
 let menuItems = [];
 let selectedItems = {};
 let currentOrderId = null;
@@ -8,7 +9,9 @@ let menuItemsContainer, selectedItemsTable, totalAmountEl, menuSearchInput, cust
 
 // Helper function to safely execute database queries
 async function safeDbQuery(sql, params = null) {
-    if (!dbBackend) {
+    // Use global dbBackend from webchannel.js or window.dbBackend
+    const backend = window.dbBackend || dbBackend;
+    if (!backend) {
         console.error("Database backend not initialized");
         return [];
     }
@@ -345,13 +348,28 @@ async function saveOrder(orderType, total) {
 
         // Show print receipt popup
         if (confirm("Order placed successfully! Would you like to print the receipt?")) {
-            if (typeof printOrderReceipt === 'function') {
-                await printOrderReceipt(orderId, dbBackend);
-            } else {
-                const script = document.createElement('script');
-                script.src = 'js/print_utils.js';
-                script.onload = () => printOrderReceipt(orderId, dbBackend);
-                document.head.appendChild(script);
+            try {
+                if (typeof printOrderReceipt === 'function') {
+                    await printOrderReceipt(orderId, dbBackend);
+                } else {
+                    // Load print_utils.js if not already loaded
+                    const script = document.createElement('script');
+                    script.src = 'js/print_utils.js';
+                    script.onload = async () => {
+                        if (typeof printOrderReceipt === 'function') {
+                            await printOrderReceipt(orderId, dbBackend);
+                        } else {
+                            alert("Error: Print function not available");
+                        }
+                    };
+                    script.onerror = () => {
+                        alert("Error loading print utilities");
+                    };
+                    document.head.appendChild(script);
+                }
+            } catch (error) {
+                console.error("[TAKEAWAY] Error printing receipt:", error);
+                alert("Error printing receipt: " + error.message);
             }
         }
 
@@ -810,13 +828,28 @@ async function markOrderComplete() {
 
         // Show invoice print popup
         if (confirm("Order marked as complete! Would you like to print the invoice?")) {
-            if (typeof printInvoice === 'function') {
-                await printInvoice(currentOrderId, dbBackend);
-            } else {
-                const script = document.createElement('script');
-                script.src = 'js/print_utils.js';
-                script.onload = () => printInvoice(currentOrderId, dbBackend);
-                document.head.appendChild(script);
+            try {
+                if (typeof printInvoice === 'function') {
+                    await printInvoice(currentOrderId, dbBackend);
+                } else {
+                    // Load print_utils.js if not already loaded
+                    const script = document.createElement('script');
+                    script.src = 'js/print_utils.js';
+                    script.onload = async () => {
+                        if (typeof printInvoice === 'function') {
+                            await printInvoice(currentOrderId, dbBackend);
+                        } else {
+                            alert("Error: Print function not available");
+                        }
+                    };
+                    script.onerror = () => {
+                        alert("Error loading print utilities");
+                    };
+                    document.head.appendChild(script);
+                }
+            } catch (error) {
+                console.error("[TAKEAWAY] Error printing invoice:", error);
+                alert("Error printing invoice: " + error.message);
             }
         }
 
@@ -827,6 +860,23 @@ async function markOrderComplete() {
         alert("Error marking order complete: " + error.message);
     }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    // Initialize references to DOM elements
+    menuItemsContainer = document.getElementById("menuItems");
+    totalAmountEl = document.getElementById("totalAmount");
+    menuSearchInput = document.getElementById("menuSearch");
+    customerNameInput = document.getElementById("customerName");
+
+    // Make functions global for inline buttons
+    window.removeItem = removeItem;
+    window.increaseQuantity = increaseQuantity;
+    window.decreaseQuantity = decreaseQuantity;
+
+    // Call initWebChannel to connect JS with Python backend
+    initWebChannel();
+});
+
 
 // Make functions global
 window.openEditOrderModal = openEditOrderModal;
