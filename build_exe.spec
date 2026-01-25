@@ -3,11 +3,15 @@
 
 import os
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
 
 # Get the project root directory
-project_root = Path(SPECPATH).parent
+# project_root = Path(__file__).resolve().parent
+
+project_root = Path(os.getcwd())  # current directory where pyinstaller is run
+
 
 # Data files to include
 datas = [

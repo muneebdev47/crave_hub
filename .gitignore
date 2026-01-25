@@ -31,3 +31,4 @@ build/
 *.pywz
 *.pyzw
 *.pyzwz
+database\__pycache__\db.cpython-312.pyc
