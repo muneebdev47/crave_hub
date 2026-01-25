@@ -8,7 +8,8 @@ let menuItemsContainer, totalAmountEl, menuSearchInput, customerNameInput, custo
 
 // Helper function to safely execute database queries
 async function safeDbQuery(sql, params = null) {
-    if (!dbBackend) {
+    const backend = window.dbBackend || dbBackend;
+    if (!backend) {
         console.error("Database backend not initialized");
         return [];
     }
@@ -19,10 +20,10 @@ async function safeDbQuery(sql, params = null) {
         if (params && Array.isArray(params) && params.length > 0) {
             // Use parameterized query
             const paramsJson = JSON.stringify(params);
-            response = dbBackend.execute_with_params(sql, paramsJson);
+            response = backend.execute_with_params(sql, paramsJson);
         } else {
             // Use direct query
-            response = dbBackend.execute_query(sql);
+            response = backend.execute_query(sql);
         }
 
         // Handle Promise if returned
@@ -56,14 +57,15 @@ async function safeDbQuery(sql, params = null) {
 
 // Helper function to safely execute database updates
 async function safeDbUpdate(sql, params) {
-    if (!dbBackend) {
+    const backend = window.dbBackend || dbBackend;
+    if (!backend) {
         console.error("Database backend not initialized");
         return { error: "Database backend not initialized" };
     }
 
     try {
         const paramsJson = JSON.stringify(params);
-        let response = dbBackend.execute_with_params(sql, paramsJson);
+        let response = backend.execute_with_params(sql, paramsJson);
 
         // Handle Promise if returned
         if (response && typeof response.then === 'function') {
@@ -84,54 +86,24 @@ async function safeDbUpdate(sql, params) {
     }
 }
 
-// Initialize Qt WebChannel
-function initWebChannel() {
-    if (typeof QWebChannel === 'undefined') {
-        console.log("Waiting for QWebChannel...");
-        setTimeout(initWebChannel, 100);
-        return;
-    }
-
-    if (typeof qt !== 'undefined' && qt.webChannelTransport) {
-        try {
-            console.log("Initializing WebChannel...");
-            new QWebChannel(qt.webChannelTransport, function (channel) {
-                if (!channel || !channel.objects) {
-                    console.error("Invalid WebChannel or objects");
-                    setTimeout(initWebChannel, 500);
-                    return;
-                }
-
-                if (!channel.objects.dbBackend) {
-                    console.error("dbBackend not found in channel.objects");
-                    setTimeout(initWebChannel, 500);
-                    return;
-                }
-
-                window.dbBackend = channel.objects.dbBackend;
-                dbBackend = channel.objects.dbBackend;
-                console.log("WebChannel initialized successfully");
-
-                // Wait a bit before loading menu items to ensure backend is ready
-                setTimeout(() => {
-                    loadMenuItems();
-                    loadDeliveryOrders();
-                }, 100);
-            });
-        } catch (error) {
-            console.error("Error initializing WebChannel:", error);
-            console.error("Error details:", error.message, error.stack);
-            setTimeout(initWebChannel, 500);
-        }
+// Wait for global WebChannel to be initialized (from webchannel.js)
+function waitForWebChannel() {
+    if (window._webChannelInitialized && window.dbBackend) {
+        dbBackend = window.dbBackend;
+        console.log("[DELIVERY] WebChannel ready, loading data...");
+        setTimeout(() => {
+            loadMenuItems();
+            loadDeliveryOrders();
+        }, 100);
     } else {
-        console.warn("Qt WebChannel not available, retrying...");
-        setTimeout(initWebChannel, 500);
+        console.log("[DELIVERY] Waiting for WebChannel...");
+        setTimeout(waitForWebChannel, 100);
     }
 }
 
 // Load menu items from database
 async function loadMenuItems() {
-    if (!dbBackend) {
+    if (!(window.dbBackend || dbBackend)) {
         console.error("Database backend not initialized");
         setTimeout(loadMenuItems, 500);
         return;
@@ -296,7 +268,7 @@ function decreaseQuantity(menuItemId) {
 
 // Save order
 async function saveOrder(orderType, total) {
-    if (!dbBackend) {
+    if (!(window.dbBackend || dbBackend)) {
         alert("Database not initialized");
         return;
     }
@@ -344,15 +316,25 @@ async function saveOrder(orderType, total) {
         // Insert order items
         await insertOrderItems(orderId);
 
-        // Show print receipt popup
-        if (confirm("Order placed successfully! Would you like to print the receipt?")) {
-            if (typeof printOrderReceipt === 'function') {
-                await printOrderReceipt(orderId, dbBackend);
-            } else {
-                const script = document.createElement('script');
-                script.src = 'js/print_utils.js';
-                script.onload = () => printOrderReceipt(orderId, dbBackend);
-                document.head.appendChild(script);
+        const wantPrint = await showConfirmModal("Order placed successfully! Would you like to print the receipt?");
+        if (wantPrint) {
+            try {
+                if (typeof printOrderReceipt === 'function') {
+                    await printOrderReceipt(orderId, dbBackend);
+                } else {
+                    const script = document.createElement('script');
+                    script.src = 'js/print_utils.js';
+                    script.onload = async () => {
+                        if (typeof printOrderReceipt === 'function') {
+                            await printOrderReceipt(orderId, dbBackend);
+                        } else alert("Error: Print function not available");
+                    };
+                    script.onerror = () => alert("Error loading print utilities");
+                    document.head.appendChild(script);
+                }
+            } catch (error) {
+                console.error("[DELIVERY] Error printing receipt:", error);
+                alert("Error printing receipt: " + error.message);
             }
         }
 
@@ -384,7 +366,7 @@ async function insertOrderItems(orderId) {
 
 // Load and display delivery orders in the table
 async function loadDeliveryOrders() {
-    if (!dbBackend) {
+    if (!(window.dbBackend || dbBackend)) {
         console.error("Database backend not initialized");
         return;
     }
@@ -473,7 +455,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Place order
     placeOrderBtn.addEventListener("click", async () => {
-        if (!dbBackend) {
+        if (!(window.dbBackend || dbBackend)) {
             alert("Database backend not initialized. Please wait...");
             return;
         }
@@ -509,13 +491,18 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         orderSummary += `\nTotal: Rs. ${total.toFixed(2)}`;
 
-        const confirmed = confirm(orderSummary + "\n\nConfirm order?");
-        if (confirmed) {
-            await saveOrder("Delivery", total);
-        }
+        const confirmed = await showConfirmModal(orderSummary + "\n\nConfirm order?");
+        if (confirmed) await saveOrder("Delivery", total);
     });
 
-    initWebChannel();
+    waitForWebChannel();
+    window.addEventListener('webchannel-ready', () => {
+        if (window.dbBackend) {
+            dbBackend = window.dbBackend;
+            if (!menuItems || menuItems.length === 0) loadMenuItems();
+            loadDeliveryOrders();
+        }
+    });
 });
 
 // Open edit order modal
@@ -794,17 +781,17 @@ async function updateOrder() {
 
 // Mark order as complete
 async function markOrderComplete() {
-    if (!currentOrderId || !dbBackend) {
+    if (!currentOrderId || !(window.dbBackend || dbBackend)) {
         alert("Invalid order or database not initialized");
         return;
     }
 
-    if (!confirm("Are you sure you want to mark this order as complete?")) {
-        return;
-    }
+    const sure = typeof showConfirmModal === 'function'
+        ? await showConfirmModal("Are you sure you want to mark this order as complete?")
+        : confirm("Are you sure you want to mark this order as complete?");
+    if (!sure) return;
 
     try {
-        // Get order total
         const orderSql = `SELECT total FROM orders WHERE id = ?`;
         const orders = await safeDbQuery(orderSql, [currentOrderId]);
         if (!orders || orders.length === 0) {
@@ -813,47 +800,33 @@ async function markOrderComplete() {
         }
         const orderTotal = orders[0].total;
 
-        // Update order status
         const updateStatusSql = `UPDATE orders SET order_status = 'completed', payment_status = 'paid' WHERE id = ?`;
         await safeDbUpdate(updateStatusSql, [currentOrderId]);
 
-        // Create payment transaction
         const now = new Date().toISOString();
         const paymentSql = `INSERT INTO payment_transactions (order_id, amount, payment_method, payment_status, created_at) VALUES (?, ?, ?, ?, ?)`;
         await safeDbUpdate(paymentSql, [currentOrderId, orderTotal, 'cash', 'completed', now]);
 
-        // Show invoice print popup
-        if (confirm("Order marked as complete! Would you like to print the invoice?")) {
+        // Always ask: thermal receipt (same as place order)
+        const wantPrint = await showConfirmModal("Order marked as complete! Would you like to print the receipt? (You can print more copies anytime.)");
+        if (wantPrint) {
             try {
-                // Ensure printInvoice is available
-                if (typeof window.printInvoice === 'function') {
-                    console.log("Calling printInvoice for order:", currentOrderId);
-                    await window.printInvoice(currentOrderId, dbBackend);
-                } else if (typeof printInvoice === 'function') {
-                    console.log("Calling printInvoice (global) for order:", currentOrderId);
-                    await printInvoice(currentOrderId, dbBackend);
+                if (typeof printOrderReceipt === 'function') {
+                    await printOrderReceipt(currentOrderId, dbBackend);
                 } else {
-                    console.warn("printInvoice not found, loading print_utils.js");
-                    // Dynamically load print_utils.js if not already loaded
                     const script = document.createElement('script');
                     script.src = 'js/print_utils.js';
                     script.onload = async () => {
-                        console.log("print_utils.js loaded, calling printInvoice");
-                        if (typeof window.printInvoice === 'function') {
-                            await window.printInvoice(currentOrderId, dbBackend);
-                        } else {
-                            alert("Error: printInvoice function not available after loading script");
-                        }
+                        if (typeof printOrderReceipt === 'function') {
+                            await printOrderReceipt(currentOrderId, dbBackend);
+                        } else alert("Error: Print function not available");
                     };
-                    script.onerror = () => {
-                        alert("Error loading print utilities. Please check the console for details.");
-                        console.error("Failed to load print_utils.js");
-                    };
+                    script.onerror = () => alert("Error loading print utilities");
                     document.head.appendChild(script);
                 }
             } catch (error) {
-                console.error("Error printing invoice:", error);
-                alert("Error printing invoice: " + error.message);
+                console.error("[DELIVERY] Error printing receipt:", error);
+                alert("Error printing receipt: " + error.message);
             }
         }
 

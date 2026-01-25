@@ -957,15 +957,25 @@ async function toggleOrderStatus() {
             const paymentSql = `INSERT INTO payment_transactions (order_id, amount, payment_method, payment_status, created_at) VALUES (?, ?, ?, ?, ?)`;
             await safeDbUpdate(paymentSql, [currentOrderId, orderTotal, 'cash', 'completed', now]);
 
-            // Show invoice print popup
-            if (confirm("Order marked as complete! Would you like to print the invoice?")) {
-                if (typeof printInvoice === 'function') {
-                    await printInvoice(currentOrderId, dbBackend);
-                } else {
-                    const script = document.createElement('script');
-                    script.src = 'js/print_utils.js';
-                    script.onload = () => printInvoice(currentOrderId, dbBackend);
-                    document.head.appendChild(script);
+            const wantPrint = await showConfirmModal("Order marked as complete! Would you like to print the receipt? (You can print more copies anytime.)");
+            if (wantPrint) {
+                try {
+                    if (typeof printOrderReceipt === 'function') {
+                        await printOrderReceipt(currentOrderId, dbBackend);
+                    } else {
+                        const script = document.createElement('script');
+                        script.src = 'js/print_utils.js';
+                        script.onload = async () => {
+                            if (typeof printOrderReceipt === 'function') {
+                                await printOrderReceipt(currentOrderId, dbBackend);
+                            } else alert("Error: Print function not available");
+                        };
+                        script.onerror = () => alert("Error loading print utilities");
+                        document.head.appendChild(script);
+                    }
+                } catch (e) {
+                    console.error("[DASHBOARD] Error printing receipt:", e);
+                    alert("Error printing receipt: " + e.message);
                 }
             }
         }
@@ -986,7 +996,7 @@ async function toggleOrderStatus() {
             statusButton.textContent = newStatus === 'completed' ? 'Mark Pending' : 'Mark Complete';
         }
 
-        alert(`Order status changed to ${statusText}!`);
+        await showAlertModal(`Order status changed to ${statusText}!`);
         loadRecentOrders();
 
         // If it's a table order, trigger a refresh on the table orders page

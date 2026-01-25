@@ -87,48 +87,21 @@ async function safeDbUpdate(sql, params) {
     }
 }
 
-// Initialize Qt WebChannel
-function initWebChannel() {
-    if (typeof QWebChannel === 'undefined') {
-        console.log("Waiting for QWebChannel...");
-        setTimeout(initWebChannel, 100);
-        return;
-    }
-
-    if (typeof qt !== 'undefined' && qt.webChannelTransport) {
-        try {
-            console.log("Initializing WebChannel...");
-            new QWebChannel(qt.webChannelTransport, function (channel) {
-                if (!channel || !channel.objects) {
-                    console.error("Invalid WebChannel or objects");
-                    setTimeout(initWebChannel, 500);
-                    return;
-                }
-
-                if (!channel.objects.dbBackend) {
-                    console.error("dbBackend not found in channel.objects");
-                    setTimeout(initWebChannel, 500);
-                    return;
-                }
-
-                window.dbBackend = channel.objects.dbBackend;
-                dbBackend = channel.objects.dbBackend;
-                console.log("WebChannel initialized successfully");
-
-                // Wait a bit before loading menu items to ensure backend is ready
-                setTimeout(() => {
-                    loadMenuItems();
-                    loadTakeawayOrders();
-                }, 100);
-            });
-        } catch (error) {
-            console.error("Error initializing WebChannel:", error);
-            console.error("Error details:", error.message, error.stack);
-            setTimeout(initWebChannel, 500);
-        }
+// Wait for global WebChannel to be initialized (from webchannel.js)
+function waitForWebChannel() {
+    if (window._webChannelInitialized && window.dbBackend) {
+        // WebChannel is ready, assign to local variable
+        dbBackend = window.dbBackend;
+        console.log("[TAKEAWAY] WebChannel ready, loading data...");
+        // Wait a bit before loading menu items to ensure backend is ready
+        setTimeout(() => {
+            loadMenuItems();
+            loadTakeawayOrders();
+        }, 100);
     } else {
-        console.warn("Qt WebChannel not available, retrying...");
-        setTimeout(initWebChannel, 500);
+        // Wait for WebChannel initialization
+        console.log("[TAKEAWAY] Waiting for WebChannel...");
+        setTimeout(waitForWebChannel, 100);
     }
 }
 
@@ -297,6 +270,91 @@ function decreaseQuantity(menuItemId) {
     }
 }
 
+function printReceiptDirect() {
+    if (!window.printerBackend) {
+        alert("Printer not available. Restart app.");
+        return;
+    }
+
+    const now = new Date();
+    let text = "";
+    text += "===============================\n";
+    text += "        CRAVE HUB\n";
+    text += "===============================\n\n";
+    text += `Customer: ${customerNameInput.value}\n`;
+    text += `Date: ${now.toLocaleString()}\n\n`;
+    text += "ITEM        QTY   AMOUNT\n";
+    text += "-------------------------------\n";
+
+    let total = 0;
+    Object.values(selectedItems).forEach(item => {
+        const lineTotal = item.qty * item.price;
+        total += lineTotal;
+        text += `${item.name.padEnd(12).slice(0,12)} ${String(item.qty).padStart(3)}  Rs.${lineTotal.toFixed(2)}\n`;
+    });
+
+    text += "-------------------------------\n";
+    text += `TOTAL: Rs.${total.toFixed(2)}\n\n`;
+    text += "Thank you!\n\n\n";
+
+    const result = window.printerBackend.print_receipt(text);
+
+    try {
+        const res = JSON.parse(result);
+        if (!res.success) throw new Error(res.error);
+    } catch (e) {
+        alert("Print failed: " + e.message);
+    }
+}
+
+function buildReceiptText() {
+    const now = new Date();
+    let text = "";
+
+    text += "================================\n";
+    text += "         CRAVE HUB CAFE\n";
+    text += "================================\n\n";
+    text += `Customer: ${customerNameInput.value}\n`;
+    text += `Date: ${now.toLocaleString()}\n\n`;
+    text += "ITEM        QTY    AMOUNT\n";
+    text += "--------------------------------\n";
+
+    let total = 0;
+
+    Object.values(selectedItems).forEach(item => {
+        const lineTotal = item.qty * item.price;
+        total += lineTotal;
+
+        text += `${item.name.slice(0,12).padEnd(12)} `;
+        text += `${String(item.qty).padStart(3)} `;
+        text += `Rs.${lineTotal.toFixed(2)}\n`;
+    });
+
+    text += "--------------------------------\n";
+    text += `TOTAL: Rs.${total.toFixed(2)}\n\n`;
+    text += "Thank you!\n\n\n";
+
+    return text;
+}
+
+function printReceiptNow() {
+    if (!window.printerBackend) {
+        alert("Printer backend not available. Restart app.");
+        return;
+    }
+
+    const receiptText = buildReceiptText();
+    const result = window.printerBackend.print_receipt(receiptText);
+
+    try {
+        const res = JSON.parse(result);
+        if (!res.success) throw new Error(res.error);
+    } catch (e) {
+        alert("Printer error: " + e.message);
+    }
+}
+
+
 // Save order
 async function saveOrder(orderType, total) {
     if (!dbBackend) {
@@ -346,25 +404,21 @@ async function saveOrder(orderType, total) {
         // Insert order items
         await insertOrderItems(orderId);
 
-        // Show print receipt popup
-        if (confirm("Order placed successfully! Would you like to print the receipt?")) {
+        // Show print receipt popup (dark modal – always ask)
+        const wantPrint = await showConfirmModal("Order placed successfully! Would you like to print the receipt?");
+        if (wantPrint) {
             try {
                 if (typeof printOrderReceipt === 'function') {
-                    await printOrderReceipt(orderId, dbBackend);
+                    printReceiptDirect();
                 } else {
-                    // Load print_utils.js if not already loaded
                     const script = document.createElement('script');
                     script.src = 'js/print_utils.js';
                     script.onload = async () => {
                         if (typeof printOrderReceipt === 'function') {
-                            await printOrderReceipt(orderId, dbBackend);
-                        } else {
-                            alert("Error: Print function not available");
-                        }
+                            printReceiptDirect();
+                        } else alert("Error: Print function not available");
                     };
-                    script.onerror = () => {
-                        alert("Error loading print utilities");
-                    };
+                    script.onerror = () => alert("Error loading print utilities");
                     document.head.appendChild(script);
                 }
             } catch (error) {
@@ -457,13 +511,23 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         orderSummary += `\nTotal: Rs. ${total.toFixed(2)}`;
 
-        const confirmed = confirm(orderSummary + "\n\nConfirm order?");
-        if (confirmed) {
-            await saveOrder("Takeaway", total);
-        }
+        const confirmed = await showConfirmModal(orderSummary + "\n\nConfirm order?");
+        if (confirmed) await saveOrder("Takeaway", total);
     });
 
-    initWebChannel();
+    // Wait for global WebChannel to be initialized
+    waitForWebChannel();
+    
+    // Also listen for the webchannel-ready event as a backup
+    window.addEventListener('webchannel-ready', () => {
+        if (window.dbBackend) {
+            dbBackend = window.dbBackend;
+            if (!menuItems || menuItems.length === 0) {
+                loadMenuItems();
+            }
+            loadTakeawayOrders();
+        }
+    });
 });
 
 // Load and display all orders in the table
@@ -803,12 +867,10 @@ async function markOrderComplete() {
         return;
     }
 
-    if (!confirm("Are you sure you want to mark this order as complete?")) {
-        return;
-    }
+    const sure = await showConfirmModal("Are you sure you want to mark this order as complete?");
+    if (!sure) return;
 
     try {
-        // Get order total
         const orderSql = `SELECT total FROM orders WHERE id = ?`;
         const orders = await safeDbQuery(orderSql, [currentOrderId]);
         if (!orders || orders.length === 0) {
@@ -817,39 +879,33 @@ async function markOrderComplete() {
         }
         const orderTotal = orders[0].total;
 
-        // Update order status
         const updateStatusSql = `UPDATE orders SET order_status = 'completed', payment_status = 'paid' WHERE id = ?`;
         await safeDbUpdate(updateStatusSql, [currentOrderId]);
 
-        // Create payment transaction
         const now = new Date().toISOString();
         const paymentSql = `INSERT INTO payment_transactions (order_id, amount, payment_method, payment_status, created_at) VALUES (?, ?, ?, ?, ?)`;
         await safeDbUpdate(paymentSql, [currentOrderId, orderTotal, 'cash', 'completed', now]);
 
-        // Show invoice print popup
-        if (confirm("Order marked as complete! Would you like to print the invoice?")) {
+        // Always ask: thermal receipt (same as place order)
+        const wantPrint = await showConfirmModal("Order marked as complete! Would you like to print the receipt? (You can print more copies anytime.)");
+        if (wantPrint) {
             try {
-                if (typeof printInvoice === 'function') {
-                    await printInvoice(currentOrderId, dbBackend);
+                if (typeof printOrderReceipt === 'function') {
+                    await printOrderReceipt(currentOrderId, dbBackend);
                 } else {
-                    // Load print_utils.js if not already loaded
                     const script = document.createElement('script');
                     script.src = 'js/print_utils.js';
                     script.onload = async () => {
-                        if (typeof printInvoice === 'function') {
-                            await printInvoice(currentOrderId, dbBackend);
-                        } else {
-                            alert("Error: Print function not available");
-                        }
+                        if (typeof printOrderReceipt === 'function') {
+                            await printOrderReceipt(currentOrderId, dbBackend);
+                        } else alert("Error: Print function not available");
                     };
-                    script.onerror = () => {
-                        alert("Error loading print utilities");
-                    };
+                    script.onerror = () => alert("Error loading print utilities");
                     document.head.appendChild(script);
                 }
             } catch (error) {
-                console.error("[TAKEAWAY] Error printing invoice:", error);
-                alert("Error printing invoice: " + error.message);
+                console.error("[TAKEAWAY] Error printing receipt:", error);
+                alert("Error printing receipt: " + error.message);
             }
         }
 
@@ -873,8 +929,10 @@ document.addEventListener("DOMContentLoaded", () => {
     window.increaseQuantity = increaseQuantity;
     window.decreaseQuantity = decreaseQuantity;
 
-    // Call initWebChannel to connect JS with Python backend
-    initWebChannel();
+    // Wait for global WebChannel to be initialized (already handled above, but keep for safety)
+    if (!window._webChannelInitialized) {
+        waitForWebChannel();
+    }
 });
 
 

@@ -6,7 +6,8 @@ let currentOrderId = null;
 
 // Helper function to safely execute database queries
 async function safeDbQuery(sql, params = null) {
-    if (!dbBackend) {
+    const backend = window.dbBackend || dbBackend;
+    if (!backend) {
         console.error("Database backend not initialized");
         return [];
     }
@@ -14,13 +15,11 @@ async function safeDbQuery(sql, params = null) {
     try {
         let response;
 
-        if (params && params.length > 0) {
-            // Use parameterized query
+        if (params && Array.isArray(params) && params.length > 0) {
             const paramsJson = JSON.stringify(params);
-            response = dbBackend.execute_with_params(sql, paramsJson);
+            response = backend.execute_with_params(sql, paramsJson);
         } else {
-            // Use direct query
-            response = dbBackend.execute_query(sql);
+            response = backend.execute_query(sql);
         }
 
         // Handle Promise if returned
@@ -54,14 +53,15 @@ async function safeDbQuery(sql, params = null) {
 
 // Helper function to safely execute database updates
 async function safeDbUpdate(sql, params) {
-    if (!dbBackend) {
+    const backend = window.dbBackend || dbBackend;
+    if (!backend) {
         console.error("Database backend not initialized");
         return { error: "Database backend not initialized" };
     }
 
     try {
         const paramsJson = JSON.stringify(params);
-        let response = dbBackend.execute_with_params(sql, paramsJson);
+        let response = backend.execute_with_params(sql, paramsJson);
 
         // Handle Promise if returned
         if (response && typeof response.then === 'function') {
@@ -82,26 +82,18 @@ async function safeDbUpdate(sql, params) {
     }
 }
 
-// Initialize Qt WebChannel
-function initWebChannel() {
-    if (typeof QWebChannel === 'undefined') {
-        setTimeout(initWebChannel, 100);
-        return;
-    }
-
-    if (typeof qt !== 'undefined' && qt.webChannelTransport) {
-        try {
-            new QWebChannel(qt.webChannelTransport, function (channel) {
-                window.dbBackend = channel.objects.dbBackend;
-                dbBackend = channel.objects.dbBackend;
-                loadMenuItems();
-                loadTableOrders();
-            });
-        } catch (error) {
-            console.error("Error initializing WebChannel:", error);
-        }
+// Wait for global WebChannel to be initialized (from webchannel.js)
+function waitForWebChannel() {
+    if (window._webChannelInitialized && window.dbBackend) {
+        dbBackend = window.dbBackend;
+        console.log("[TABLE] WebChannel ready, loading data...");
+        setTimeout(() => {
+            loadMenuItems();
+            loadTableOrders();
+        }, 100);
     } else {
-        console.warn("Qt WebChannel not available.");
+        console.log("[TABLE] Waiting for WebChannel...");
+        setTimeout(waitForWebChannel, 100);
     }
 }
 
@@ -113,7 +105,7 @@ async function loadMenuItems() {
 
 // Load table orders - get active orders for each table
 async function loadTableOrders() {
-    if (!dbBackend) {
+    if (!(window.dbBackend || dbBackend)) {
         console.error("Database backend not initialized");
         return;
     }
@@ -452,7 +444,7 @@ async function saveOrder() {
         return;
     }
 
-    if (!dbBackend) {
+    if (!(window.dbBackend || dbBackend)) {
         alert("Database not initialized");
         return;
     }
@@ -500,18 +492,33 @@ async function saveOrder() {
 
         if (isNaN(numericOrderId) || numericOrderId <= 0) {
             console.error("Invalid order ID:", orderId, "Numeric:", numericOrderId, "Full result:", JSON.stringify(result));
-            // Try alternative: query for the last inserted order
-            console.log("Attempting fallback: querying for last order...");
             const lastOrderSql = "SELECT id FROM orders ORDER BY id DESC LIMIT 1";
             const lastOrder = await safeDbQuery(lastOrderSql);
-            console.log("Last order query result:", lastOrder);
             if (lastOrder && lastOrder.length > 0) {
                 const fallbackOrderId = parseInt(lastOrder[0].id);
-                console.log("Using fallback order ID:", fallbackOrderId);
                 if (fallbackOrderId && fallbackOrderId > 0) {
-                    // Use fallback ID
                     await insertOrderItems(fallbackOrderId);
-                    alert("Order placed successfully!");
+                    const wantPrint = await showConfirmModal("Order placed successfully! Would you like to print the receipt?");
+                    if (wantPrint) {
+                        try {
+                            if (typeof printOrderReceipt === 'function') {
+                                await printOrderReceipt(fallbackOrderId, dbBackend);
+                            } else {
+                                const script = document.createElement('script');
+                                script.src = 'js/print_utils.js';
+                                script.onload = async () => {
+                                    if (typeof printOrderReceipt === 'function') {
+                                        await printOrderReceipt(fallbackOrderId, dbBackend);
+                                    } else alert("Error: Print function not available");
+                                };
+                                script.onerror = () => alert("Error loading print utilities");
+                                document.head.appendChild(script);
+                            }
+                        } catch (e) {
+                            console.error("[TABLE] Error printing receipt:", e);
+                            alert("Error printing receipt: " + e.message);
+                        }
+                    }
                     closeOrderModal();
                     loadTableOrders();
                     return;
@@ -527,16 +534,25 @@ async function saveOrder() {
         // Insert order items using the order ID
         await insertOrderItems(finalOrderId);
 
-        // Show print receipt popup
-        if (confirm("Order placed successfully! Would you like to print the receipt?")) {
-            if (typeof printOrderReceipt === 'function') {
-                await printOrderReceipt(finalOrderId, dbBackend);
-            } else {
-                // Load print utils if not already loaded
-                const script = document.createElement('script');
-                script.src = 'js/print_utils.js';
-                script.onload = () => printOrderReceipt(finalOrderId, dbBackend);
-                document.head.appendChild(script);
+        const wantPrint = await showConfirmModal("Order placed successfully! Would you like to print the receipt?");
+        if (wantPrint) {
+            try {
+                if (typeof printOrderReceipt === 'function') {
+                    await printOrderReceipt(finalOrderId, dbBackend);
+                } else {
+                    const script = document.createElement('script');
+                    script.src = 'js/print_utils.js';
+                    script.onload = async () => {
+                        if (typeof printOrderReceipt === 'function') {
+                            await printOrderReceipt(finalOrderId, dbBackend);
+                        } else alert("Error: Print function not available");
+                    };
+                    script.onerror = () => alert("Error loading print utilities");
+                    document.head.appendChild(script);
+                }
+            } catch (error) {
+                console.error("[TABLE] Error printing receipt:", error);
+                alert("Error printing receipt: " + error.message);
             }
         }
 
@@ -577,7 +593,7 @@ async function updateOrder() {
         return;
     }
 
-    if (!currentOrderId || !dbBackend) {
+    if (!currentOrderId || !(window.dbBackend || dbBackend)) {
         alert("Invalid order or database not initialized");
         return;
     }
@@ -613,17 +629,15 @@ async function updateOrder() {
 
 // Mark order as complete
 async function markOrderComplete() {
-    if (!currentOrderId || !dbBackend) {
+    if (!currentOrderId || !(window.dbBackend || dbBackend)) {
         alert("Invalid order or database not initialized");
         return;
     }
 
-    if (!confirm("Are you sure you want to mark this order as complete?")) {
-        return;
-    }
+    const sure = await showConfirmModal("Are you sure you want to mark this order as complete?");
+    if (!sure) return;
 
     try {
-        // Get order total
         const orderSql = `SELECT total FROM orders WHERE id = ?`;
         const orders = await safeDbQuery(orderSql, [currentOrderId]);
         if (!orders || orders.length === 0) {
@@ -632,25 +646,33 @@ async function markOrderComplete() {
         }
         const orderTotal = orders[0].total;
 
-        // Update order status
         const updateOrderSql = `UPDATE orders SET order_status = 'completed', payment_status = 'paid' WHERE id = ?`;
         await safeDbUpdate(updateOrderSql, [currentOrderId]);
 
-        // Create payment transaction
         const now = new Date().toISOString();
         const paymentSql = `INSERT INTO payment_transactions (order_id, amount, payment_method, payment_status, created_at) VALUES (?, ?, ?, ?, ?)`;
         await safeDbUpdate(paymentSql, [currentOrderId, orderTotal, 'cash', 'completed', now]);
 
-        // Show invoice print popup
-        if (confirm("Order marked as complete! Would you like to print the invoice?")) {
-            if (typeof printInvoice === 'function') {
-                await printInvoice(currentOrderId, dbBackend);
-            } else {
-                // Load print utils if not already loaded
-                const script = document.createElement('script');
-                script.src = 'js/print_utils.js';
-                script.onload = () => printInvoice(currentOrderId, dbBackend);
-                document.head.appendChild(script);
+        // Always ask: thermal receipt (same as place order)
+        const wantPrint = await showConfirmModal("Order marked as complete! Would you like to print the receipt? (You can print more copies anytime.)");
+        if (wantPrint) {
+            try {
+                if (typeof printOrderReceipt === 'function') {
+                    await printOrderReceipt(currentOrderId, dbBackend);
+                } else {
+                    const script = document.createElement('script');
+                    script.src = 'js/print_utils.js';
+                    script.onload = async () => {
+                        if (typeof printOrderReceipt === 'function') {
+                            await printOrderReceipt(currentOrderId, dbBackend);
+                        } else alert("Error: Print function not available");
+                    };
+                    script.onerror = () => alert("Error loading print utilities");
+                    document.head.appendChild(script);
+                }
+            } catch (error) {
+                console.error("[TABLE] Error printing receipt:", error);
+                alert("Error printing receipt: " + error.message);
             }
         }
 
@@ -682,5 +704,12 @@ window.onclick = function (event) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    initWebChannel();
+    waitForWebChannel();
+    window.addEventListener('webchannel-ready', () => {
+        if (window.dbBackend) {
+            dbBackend = window.dbBackend;
+            if (!menuItems || menuItems.length === 0) loadMenuItems();
+            loadTableOrders();
+        }
+    });
 });

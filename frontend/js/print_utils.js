@@ -1,12 +1,115 @@
 // ===============================
+// DARK-THEMED CONFIRM MODAL (replaces native confirm - fixes white/invisible popups)
+// ===============================
+
+const CONFIRM_MODAL_ID = "print-confirm-modal";
+
+function showConfirmModal(message) {
+    return new Promise((resolve) => {
+        let wrap = document.getElementById(CONFIRM_MODAL_ID);
+        if (!wrap) {
+            wrap = document.createElement("div");
+            wrap.id = CONFIRM_MODAL_ID;
+            wrap.innerHTML = `
+                <div class="print-confirm-overlay" id="print-confirm-overlay"></div>
+                <div class="print-confirm-box">
+                    <p class="print-confirm-message" id="print-confirm-message"></p>
+                    <div class="print-confirm-actions">
+                        <button type="button" class="print-confirm-btn print-confirm-yes" id="print-confirm-yes">Yes</button>
+                        <button type="button" class="print-confirm-btn print-confirm-no" id="print-confirm-no">No</button>
+                    </div>
+                </div>
+            `;
+            const style = document.createElement("style");
+            style.id = "print-confirm-modal-styles";
+            style.textContent = `
+                #${CONFIRM_MODAL_ID} { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; }
+                .print-confirm-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.85); z-index: 0; }
+                .print-confirm-box { position: relative; z-index: 1; background: #1e1e1e; color: #fff; padding: 24px 28px; border-radius: 12px; max-width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); border: 1px solid #2A2A2A; }
+                .print-confirm-message { margin: 0 0 20px 0; font-size: 16px; line-height: 1.5; color: #eee; white-space: pre-wrap; }
+                .print-confirm-actions { display: flex; gap: 12px; justify-content: flex-end; }
+                .print-confirm-btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
+                .print-confirm-yes { background: #4caf50; color: #fff; }
+                .print-confirm-yes:hover { background: #45a049; }
+                .print-confirm-no { background: #2A2A2A; color: #eee; }
+                .print-confirm-no:hover { background: #3E3E3E; }
+            `;
+            document.head.appendChild(style);
+            document.body.appendChild(wrap);
+        }
+
+        const msgEl = document.getElementById("print-confirm-message");
+        const yesBtn = document.getElementById("print-confirm-yes");
+        const noBtn = document.getElementById("print-confirm-no");
+        const overlay = document.getElementById("print-confirm-overlay");
+
+        if (msgEl) msgEl.textContent = message;
+        wrap.style.display = "flex";
+
+        function close(val) {
+            wrap.style.display = "none";
+            yesBtn.removeEventListener("click", onYes);
+            noBtn.removeEventListener("click", onNo);
+            overlay.removeEventListener("click", onNo);
+            resolve(val);
+        }
+        function onYes() { close(true); }
+        function onNo() { close(false); }
+
+        yesBtn.addEventListener("click", onYes);
+        noBtn.addEventListener("click", onNo);
+        overlay.addEventListener("click", onNo);
+    });
+}
+
+const ALERT_MODAL_ID = "print-alert-modal";
+
+function showAlertModal(message) {
+    return new Promise((resolve) => {
+        let wrap = document.getElementById(ALERT_MODAL_ID);
+        if (!wrap) {
+            wrap = document.createElement("div");
+            wrap.id = ALERT_MODAL_ID;
+            wrap.innerHTML = `
+                <div class="print-alert-overlay" id="print-alert-overlay"></div>
+                <div class="print-alert-box">
+                    <p class="print-alert-message" id="print-alert-message"></p>
+                    <div class="print-alert-actions">
+                        <button type="button" class="print-alert-btn" id="print-alert-ok">OK</button>
+                    </div>
+                </div>
+            `;
+            const style = document.createElement("style");
+            style.id = "print-alert-modal-styles";
+            style.textContent = `
+                #${ALERT_MODAL_ID} { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; }
+                .print-alert-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.85); z-index: 0; }
+                .print-alert-box { position: relative; z-index: 1; background: #1e1e1e; color: #fff; padding: 24px 28px; border-radius: 12px; max-width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); border: 1px solid #2A2A2A; }
+                .print-alert-message { margin: 0 0 20px 0; font-size: 16px; line-height: 1.5; color: #eee; white-space: pre-wrap; }
+                .print-alert-actions { display: flex; justify-content: flex-end; }
+                .print-alert-btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; background: #4caf50; color: #fff; }
+                .print-alert-btn:hover { background: #45a049; }
+            `;
+            if (!document.getElementById("print-alert-modal-styles")) document.head.appendChild(style);
+            document.body.appendChild(wrap);
+        }
+        const msgEl = document.getElementById("print-alert-message");
+        const okBtn = document.getElementById("print-alert-ok");
+        if (msgEl) msgEl.textContent = message;
+        wrap.style.display = "flex";
+        function close() {
+            wrap.style.display = "none";
+            okBtn.removeEventListener("click", close);
+            resolve();
+        }
+        okBtn.addEventListener("click", close);
+    });
+}
+
+// ===============================
 // THERMAL RECEIPT (ESC/POS)
 // ===============================
 
-// safeDbQuery should be loaded from db_utils.js
-// If not available, wait for it or use fallback
-if (typeof safeDbQuery === 'undefined') {
-    console.warn("[PRINT] safeDbQuery not found, will wait for db_utils.js");
-}
 
 function generateReceiptText(order, items) {
     const lines = [];
@@ -64,154 +167,41 @@ function generateReceiptText(order, items) {
 }
 
 async function printOrderReceipt(orderId, dbBackend) {
-    console.log(`[PRINT] Starting thermal receipt print for Order ID: ${orderId}`);
-    
+    const orderSql = `SELECT * FROM orders WHERE id = ?`;
+    const orders = await safeDbQuery(orderSql, [orderId]);
+    if (!orders.length) {
+        if (typeof showAlertModal === 'function') await showAlertModal("Order not found");
+        else alert("Order not found");
+        return;
+    }
+
+    const itemsSql = `
+        SELECT oi.quantity, oi.price, mi.name
+        FROM order_items oi
+        JOIN menu_items mi ON oi.menu_item_id = mi.id
+        WHERE oi.order_id = ?
+    `;
+    const items = await safeDbQuery(itemsSql, [orderId]);
+
+    const receiptText = generateReceiptText(orders[0], items);
+
+    if (!window.printerBackend) {
+        if (typeof showAlertModal === 'function') await showAlertModal("Printer backend not available. Restart app.");
+        else alert("Printer backend not available. Restart app.");
+        return;
+    }
+
+    let result = window.printerBackend.print_receipt(receiptText);
+    if (result && typeof result.then === 'function') result = await result;
+
     try {
-        const orderSql = `SELECT * FROM orders WHERE id = ?`;
-        const orders = await safeDbQuery(orderSql, [orderId], dbBackend);
-        
-        if (!orders || orders.length === 0) {
-            console.error(`[PRINT] Order #${orderId} not found`);
-            alert("Order not found");
-            return;
-        }
-
-        const itemsSql = `
-            SELECT oi.quantity, oi.price, mi.name, mi.category
-            FROM order_items oi
-            JOIN menu_items mi ON oi.menu_item_id = mi.id
-            WHERE oi.order_id = ?
-        `;
-        const items = await safeDbQuery(itemsSql, [orderId], dbBackend);
-        
-        console.log(`[PRINT] Order #${orderId} found, ${items.length} items`);
-
-        const receiptText = generateReceiptText(orders[0], items);
-        console.log(`[PRINT] Receipt text generated (${receiptText.length} chars)`);
-
-        // Wait for printer backend to be available
-        let printerBackend = window.printerBackend;
-        if (!printerBackend) {
-            console.log("[PRINT] Waiting for printer backend...");
-            // Wait up to 3 seconds for printer backend and WebChannel
-            for (let i = 0; i < 30; i++) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-                printerBackend = window.printerBackend;
-                // Also check if WebChannel is initialized
-                if (printerBackend && window._webChannelInitialized) {
-                    console.log("[PRINT] Printer backend and WebChannel ready");
-                    break;
-                }
-            }
-        }
-        
-        // Additional check: wait for WebChannel to be fully ready
-        if (printerBackend && !window._webChannelInitialized) {
-            console.log("[PRINT] Waiting for WebChannel initialization...");
-            await new Promise((resolve) => {
-                if (window._webChannelInitialized) {
-                    resolve();
-                } else {
-                    window.addEventListener('webchannel-ready', resolve, { once: true });
-                    // Timeout after 2 seconds
-                    setTimeout(resolve, 2000);
-                }
-            });
-        }
-
-        if (!printerBackend) {
-            console.error("[PRINT] ERROR: Printer backend not available");
-            alert("Thermal printer not available. Please check:\n1. Printer is connected\n2. Application is restarted after connecting printer\n3. Check terminal for printer initialization messages");
-            return;
-        }
-
-        if (typeof printerBackend.print_receipt !== 'function') {
-            console.error("[PRINT] ERROR: print_receipt is not a function");
-            alert("Printer backend method not available. Please restart the application.");
-            return;
-        }
-
-        console.log(`[PRINT] Sending receipt to thermal printer...`);
-        
-        try {
-            // Call the printer method - PyQt6 WebChannel with result=str returns synchronously
-            // But we'll handle it carefully to avoid callback errors
-            let result;
-            
-            // Small delay to ensure WebChannel callback queue is clear
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            try {
-                // Direct call - PyQt6 WebChannel should handle this synchronously
-                result = printerBackend.print_receipt(receiptText);
-                console.log(`[PRINT] Method called, result type: ${typeof result}`);
-            } catch (callError) {
-                console.error(`[PRINT] ERROR calling print_receipt:`, callError);
-                // Check if it's a WebChannel callback error
-                if (callError.message && (callError.message.includes('execCallbacks') || callError.message.includes('callback'))) {
-                    console.warn(`[PRINT] WebChannel callback error - retrying after delay...`);
-                    // Wait a bit and try again
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    try {
-                        result = printerBackend.print_receipt(receiptText);
-                    } catch (retryError) {
-                        throw new Error('WebChannel error. Please restart the application and try again.');
-                    }
-                } else {
-                    throw new Error(`Failed to call printer: ${callError.message}`);
-                }
-            }
-            
-            // Handle result - PyQt6 methods with result=str return the string directly
-            if (typeof result === 'string') {
-                try {
-                    const response = JSON.parse(result);
-                    if (response.success) {
-                        console.log(`[PRINT] SUCCESS: ${response.message || 'Receipt printed successfully'}`);
-                    } else {
-                        console.error(`[PRINT] ERROR: ${response.error}`);
-                        alert(`Printer Error: ${response.error}\n\nPlease check:\n1. Printer is connected and powered on\n2. USB cable is properly connected\n3. On macOS: Grant USB permissions in System Preferences\n4. Printer drivers are installed`);
-                    }
-                } catch (parseError) {
-                    // If result is not JSON, log it
-                    console.log(`[PRINT] Received non-JSON response: ${result}`);
-                    if (result.includes('error') || result.includes('Error')) {
-                        alert(`Printer Error: ${result}`);
-                    } else {
-                        console.log(`[PRINT] Assuming success (response: ${result})`);
-                    }
-                }
-            } else if (result && typeof result.then === 'function') {
-                // Handle Promise if returned (shouldn't happen with PyQt6, but just in case)
-                try {
-                    const response = await result;
-                    if (typeof response === 'string') {
-                        const parsed = JSON.parse(response);
-                        if (parsed.success) {
-                            console.log(`[PRINT] SUCCESS: ${parsed.message || 'Receipt printed successfully'}`);
-                        } else {
-                            console.error(`[PRINT] ERROR: ${parsed.error}`);
-                            alert(`Printer Error: ${parsed.error}`);
-                        }
-                    }
-                } catch (promiseError) {
-                    console.error(`[PRINT] ERROR handling promise:`, promiseError);
-                    alert(`Error printing: ${promiseError.message}`);
-                }
-            } else if (result === undefined || result === null) {
-                console.warn(`[PRINT] No response from printer backend`);
-                alert("No response from printer. Check terminal for error messages.");
-            } else {
-                console.log(`[PRINT] Received unexpected response type:`, typeof result, result);
-            }
-        } catch (error) {
-            console.error(`[PRINT] ERROR calling printer:`, error);
-            console.error(`[PRINT] Error stack:`, error.stack);
-            alert(`Error printing: ${error.message}\n\nCheck terminal for detailed error messages.`);
-        }
-    } catch (error) {
-        console.error(`[PRINT] ERROR printing receipt:`, error);
-        alert("Error printing receipt: " + error.message);
+        const res = JSON.parse(result);
+        if (!res.success) throw new Error(res.error);
+        if (typeof showAlertModal === 'function') await showAlertModal("Receipt printed successfully!");
+        else alert("Receipt printed successfully!");
+    } catch (e) {
+        if (typeof showAlertModal === 'function') await showAlertModal("Printer error: " + e.message);
+        else alert("Printer error: " + e.message);
     }
 }
 
@@ -328,5 +318,7 @@ function openPrintWindow(html) {
 }
 
 // Make functions globally accessible
+window.showConfirmModal = showConfirmModal;
+window.showAlertModal = showAlertModal;
 window.printOrderReceipt = printOrderReceipt;
 window.printInvoice = printInvoice;
