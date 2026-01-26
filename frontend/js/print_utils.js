@@ -227,7 +227,10 @@ function generateReceiptText(order, items) {
     lines.push("JazzCash:         0301 04 65 000");
     lines.push("");
     lines.push("");
-    lines.push(""); // Extra blank lines for cutting
+    lines.push("Developer:  Muneeb 0325 6000 110");
+    lines.push("");
+    lines.push("");
+    lines.push("");
 
     return lines.join("\n");
 }
