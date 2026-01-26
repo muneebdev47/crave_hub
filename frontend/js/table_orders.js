@@ -90,6 +90,7 @@ function waitForWebChannel() {
         setTimeout(() => {
             loadMenuItems();
             loadTableOrders();
+            loadTableOrdersTable();
         }, 100);
     } else {
         console.log("[TABLE] Waiting for WebChannel...");
@@ -348,6 +349,7 @@ function filterMenuItems() {
 // Make filterMenuItems globally accessible
 window.filterMenuItems = filterMenuItems;
 window.cancelOrder = cancelOrder;
+window.openTableOrderFromTable = openTableOrderFromTable;
 
 // Render menu items
 function renderMenuItems() {
@@ -574,6 +576,7 @@ async function saveOrder() {
                     }
                     closeOrderModal();
                     loadTableOrders();
+                    loadTableOrdersTable();
                     return;
                 }
             }
@@ -611,6 +614,7 @@ async function saveOrder() {
 
         closeOrderModal();
         loadTableOrders();
+        loadTableOrdersTable();
 
     } catch (error) {
         console.error("Error saving order:", error);
@@ -680,6 +684,7 @@ async function updateOrder() {
         alert("Order updated successfully!");
         closeOrderModal();
         loadTableOrders();
+        loadTableOrdersTable();
     } catch (error) {
         console.error("Error updating order:", error);
         alert("Error updating order: " + error.message);
@@ -737,9 +742,42 @@ async function markOrderComplete() {
 
         closeOrderModal();
         loadTableOrders();
+        loadTableOrdersTable();
     } catch (error) {
         console.error("Error completing order:", error);
         alert("Error completing order: " + error.message);
+    }
+}
+
+// Helper function to open order modal from table
+async function openTableOrderFromTable(orderId) {
+    if (!(window.dbBackend || dbBackend)) {
+        console.error("Database backend not initialized");
+        return;
+    }
+
+    try {
+        const orderSql = `SELECT * FROM orders WHERE id = ?`;
+        const orders = await safeDbQuery(orderSql, [orderId]);
+        
+        if (!orders || orders.length === 0) {
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Order not found");
+            } else {
+                alert("Order not found");
+            }
+            return;
+        }
+
+        const order = orders[0];
+        await openOrderModal(order.table_number, order);
+    } catch (error) {
+        console.error("Error opening order:", error);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error opening order: " + error.message);
+        } else {
+            alert("Error opening order: " + error.message);
+        }
     }
 }
 
@@ -771,12 +809,96 @@ async function cancelOrder(orderId) {
         // Close modal and reload table orders
         closeOrderModal();
         loadTableOrders();
+        loadTableOrdersTable();
     } catch (error) {
         console.error("Error cancelling order:", error);
         if (typeof showAlertModal === 'function') {
             await showAlertModal("Error cancelling order: " + error.message);
         } else {
             alert("Error cancelling order: " + error.message);
+        }
+    }
+}
+
+// Load all table orders into the table view
+async function loadTableOrdersTable() {
+    if (!(window.dbBackend || dbBackend)) {
+        console.error("Database backend not initialized");
+        return;
+    }
+
+    try {
+        const sql = `
+            SELECT id, table_number, total, created_at, order_status, payment_status
+            FROM orders
+            WHERE order_type = 'Table'
+            ORDER BY created_at DESC
+        `;
+        const orders = await safeDbQuery(sql);
+
+        const tbody = document.getElementById("tableOrdersTableBody");
+        if (!tbody) return;
+
+        tbody.innerHTML = "";
+
+        if (!orders || orders.length === 0) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = '<td colspan="7" style="text-align: center; color: white; padding: 20px;">No table orders found</td>';
+            tbody.appendChild(tr);
+            return;
+        }
+
+        orders.forEach(order => {
+            const tr = document.createElement("tr");
+            tr.style.backgroundColor = "white";
+            const date = new Date(order.created_at);
+            const dateStr = date.toLocaleDateString();
+            const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const status = order.order_status || 'pending';
+            let statusClass = 'status-pending';
+            let statusText = 'Pending';
+            if (status === 'completed') {
+                statusClass = 'status-completed';
+                statusText = 'Completed';
+            } else if (status === 'cancelled') {
+                statusClass = 'status-cancelled';
+                statusText = 'Cancelled';
+            }
+
+            const paymentStatus = order.payment_status || 'pending';
+            let paymentStatusClass = 'status-pending';
+            let paymentStatusText = 'Pending';
+            if (paymentStatus === 'paid') {
+                paymentStatusClass = 'status-completed';
+                paymentStatusText = 'Paid';
+            } else if (paymentStatus === 'cancelled') {
+                paymentStatusClass = 'status-cancelled';
+                paymentStatusText = 'Cancelled';
+            }
+
+            // Only show edit button if order is not completed or cancelled
+            const canEdit = status !== 'completed' && status !== 'cancelled';
+            const canCancel = status !== 'completed' && status !== 'cancelled';
+
+            tr.innerHTML = `
+                <td>#${order.id}</td>
+                <td>Table ${order.table_number || '-'}</td>
+                <td>${dateStr} ${timeStr}</td>
+                <td>Rs. ${parseFloat(order.total || 0).toFixed(2)}</td>
+                <td><span class="${statusClass}">${statusText}</span></td>
+                <td><span class="${paymentStatusClass}">${paymentStatusText}</span></td>
+                <td>
+                    ${canEdit ? `<button class="btn-warning" onclick="openTableOrderFromTable(${order.id})" style="padding: 5px 10px; font-size: 12px; margin-right: 5px;">Edit</button>` : ''}
+                    ${canCancel ? `<button class="btn-danger" onclick="cancelOrder(${order.id})" style="padding: 5px 10px; font-size: 12px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Cancel Order">✕</button>` : ''}
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (error) {
+        console.error("Error loading table orders:", error);
+        const tbody = document.getElementById("tableOrdersTableBody");
+        if (tbody) {
+            tbody.innerHTML = '<td colspan="7" style="text-align: center; color: #ff6b6b; padding: 20px;">Error loading orders</td>';
         }
     }
 }
@@ -806,6 +928,7 @@ document.addEventListener("DOMContentLoaded", () => {
             dbBackend = window.dbBackend;
             if (!menuItems || menuItems.length === 0) loadMenuItems();
             loadTableOrders();
+            loadTableOrdersTable();
         }
     });
 });
