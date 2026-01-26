@@ -120,6 +120,9 @@ function generateReceiptText(order, items) {
     const ESC = '\x1B';
     const BOLD_ON = ESC + '\x45\x01';  // ESC E 1 - Turn on emphasized/bold
     const BOLD_OFF = ESC + '\x45\x00'; // ESC E 0 - Turn off emphasized/bold
+    const CENTER = ESC + '\x61\x01';  // ESC a 1 - Center alignment
+    const LEFT = ESC + '\x61\x00';    // ESC a 0 - Left alignment
+    const RIGHT = ESC + '\x61\x02';   // ESC a 2 - Right alignment
     
     // Helper function to wrap text with bold formatting
     const bold = (text) => BOLD_ON + text + BOLD_OFF;
@@ -146,40 +149,40 @@ function generateReceiptText(order, items) {
     const printDateTime = `${formatDate(printDate)} ${formatTime(printDate)}`;
     const orderNo = `CHC-${String(order.id).padStart(3, '0')}`;
     
-    // Header with logo area - make logo bold
-    lines.push(bold("          CRAVEHUB CAFE "));
-    lines.push("");
-    lines.push("        Interloop Apparel # 2 Hostels");
-    lines.push("             +92 304 04 65 000");
-    
-    // Order Information Section - bold headings only
-    lines.push(bold("Order No:") + "        " + orderNo);
-    lines.push(bold("Order Date:") + "      " + orderDate);
-    lines.push(bold("Print Time:") + "      " + printDateTime);
+    // Header - centered (no space on top)
+    lines.push(CENTER + BOLD_ON + "CRAVEHUB CAFE" + BOLD_OFF + LEFT);
+    lines.push(CENTER + "Interloop Apparel # 2 Hostels" + LEFT);
+    lines.push(CENTER + "+92 304 04 65 000" + LEFT);
     lines.push("");
     
-    // Customer information - bold headings only
+    // Order Information Section - right aligned, bold headings only
+    lines.push(RIGHT + bold("Order No:") + "        " + orderNo + LEFT);
+    lines.push(RIGHT + bold("Order Date:") + "      " + orderDate + LEFT);
+    lines.push(RIGHT + bold("Print Time:") + "      " + printDateTime + LEFT);
+    lines.push("");
+    
+    // Customer information - right aligned, bold headings only
     if (order.customer_name) {
         const customerName = order.customer_name.startsWith('Mr. ') || order.customer_name.startsWith('Ms. ') ? order.customer_name : `Mr. ${order.customer_name}`;
-        lines.push(bold("Customer:") + "        " + customerName);
+        lines.push(RIGHT + bold("Customer:") + "        " + customerName + LEFT);
     }
     
     if (order.customer_phone) {
-        lines.push(bold("Phone:") + "           " + order.customer_phone);
+        lines.push(RIGHT + bold("Phone:") + "           " + order.customer_phone + LEFT);
     }
     
     if (order.table_number) {
-        lines.push(bold("Table:") + "           " + order.table_number);
+        lines.push(RIGHT + bold("Table:") + "           " + order.table_number + LEFT);
     }
     
-    // Address - for delivery orders use customer_address, otherwise default - bold heading only
+    // Address - for delivery orders use customer_address, otherwise default - right aligned, bold heading only
     if (order.order_type === 'Delivery' && order.customer_address) {
-        lines.push(bold("Address:") + "         " + order.customer_address);
+        lines.push(RIGHT + bold("Address:") + "         " + order.customer_address + LEFT);
     } else if (order.order_type !== 'Delivery') {
         // For non-delivery orders, show default address
-        lines.push(bold("Address:") + "         Interloop Apparel #2 Hostels");
+        lines.push(RIGHT + bold("Address:") + "         Interloop Apparel #2 Hostels" + LEFT);
     }
-    lines.push(bold("Order Due Date:") + "  " + orderDate);
+    lines.push(RIGHT + bold("Order Due Date:") + "  " + orderDate + LEFT);
     lines.push("");
     
     // Items Table Header - bold header row
@@ -226,12 +229,13 @@ function generateReceiptText(order, items) {
     const paid = order.payment_status === 'paid' ? netAmount : 0;
     const balance = netAmount - paid;
     
-    lines.push(bold("No of Pieces:") + "     " + totalQty);
-    lines.push(bold("Gross Amount:") + "     " + subtotal.toFixed(0));
-    lines.push(bold("Discount:") + "         " + discountAmount.toFixed(0));
-    lines.push(bold("Net Amount:") + "       " + netAmount.toFixed(0));
-    lines.push(bold("Paid:") + "             " + paid.toFixed(0));
-    lines.push(bold("Balance:") + "          " + balance.toFixed(0));
+    // Summary Section - right aligned, bold headings only
+    lines.push(RIGHT + bold("No of Pieces:") + "     " + totalQty + LEFT);
+    lines.push(RIGHT + bold("Gross Amount:") + "     " + subtotal.toFixed(0) + LEFT);
+    lines.push(RIGHT + bold("Discount:") + "         " + discountAmount.toFixed(0) + LEFT);
+    lines.push(RIGHT + bold("Net Amount:") + "       " + netAmount.toFixed(0) + LEFT);
+    lines.push(RIGHT + bold("Paid:") + "             " + paid.toFixed(0) + LEFT);
+    lines.push(RIGHT + bold("Balance:") + "          " + balance.toFixed(0) + LEFT);
     lines.push("");
     
     // Notes Section - bold heading only
