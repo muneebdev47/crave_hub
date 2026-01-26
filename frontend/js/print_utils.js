@@ -116,6 +116,14 @@ function generateReceiptText(order, items) {
     const date = new Date(order.created_at);
     const printDate = new Date();
     
+    // ESC/POS commands for formatting
+    const ESC = '\x1B';
+    const BOLD_ON = ESC + '\x45\x01';  // ESC E 1 - Turn on emphasized/bold
+    const BOLD_OFF = ESC + '\x45\x00'; // ESC E 0 - Turn off emphasized/bold
+    
+    // Helper function to wrap text with bold formatting
+    const bold = (text) => BOLD_ON + text + BOLD_OFF;
+    
     // Format dates
     const formatDate = (d) => {
         const day = String(d.getDate()).padStart(2, '0');
@@ -138,49 +146,45 @@ function generateReceiptText(order, items) {
     const printDateTime = `${formatDate(printDate)} ${formatTime(printDate)}`;
     const orderNo = `CHC-${String(order.id).padStart(3, '0')}`;
     
-    // Header with logo area
-    // ASCII art logo (works on all thermal printers)
-    lines.push("    ╔═════════════════╗");
-    lines.push("    ║   CRAVEHUB CAFE ║");
-    lines.push("    ╚═════════════════╝");
+    // Header with logo area - make logo bold
+    lines.push(bold("       CRAVEHUB CAFE "));
     lines.push("");
     lines.push("Interloop Apparel # 2 Hostels");
     lines.push("+92 304 04 65 000");
     
-    // Order Information Section
-    lines.push("Order No:        " + orderNo);
-    lines.push("Order Date:      " + orderDate);
-    lines.push("Print Date & Time: " + printDateTime);
-    lines.push("Sales Associate:  CRAVEHUB");
+    // Order Information Section - bold headings only
+    lines.push(bold("Order No:") + "        " + orderNo);
+    lines.push(bold("Order Date:") + "      " + orderDate);
+    lines.push(bold("Print Date & Time:") + " " + printDateTime);
+    lines.push(bold("Sales Associate:") + "  CRAVEHUB");
     
-    // Customer information
+    // Customer information - bold headings only
     if (order.customer_name) {
-        lines.push("Customer:        " + (order.customer_name.startsWith('Mr. ') || order.customer_name.startsWith('Ms. ') ? order.customer_name : `Mr. ${order.customer_name}`));
-    } else {
-        lines.push("Customer:        Mr. Walking Customer");
+        const customerName = order.customer_name.startsWith('Mr. ') || order.customer_name.startsWith('Ms. ') ? order.customer_name : `Mr. ${order.customer_name}`;
+        lines.push(bold("Customer:") + "        " + customerName);
     }
     
     if (order.customer_phone) {
-        lines.push("Phone:           " + order.customer_phone);
+        lines.push(bold("Phone:") + "           " + order.customer_phone);
     }
     
     if (order.table_number) {
-        lines.push("Table:           " + order.table_number);
+        lines.push(bold("Table:") + "           " + order.table_number);
     }
     
-    // Address - for delivery orders use customer_address, otherwise default
+    // Address - for delivery orders use customer_address, otherwise default - bold heading only
     if (order.order_type === 'Delivery' && order.customer_address) {
-        lines.push("Address:         " + order.customer_address);
+        lines.push(bold("Address:") + "         " + order.customer_address);
     } else if (order.order_type !== 'Delivery') {
         // For non-delivery orders, show default address
-        lines.push("Address:         Interloop Apparel #2 Hostels");
+        lines.push(bold("Address:") + "         Interloop Apparel #2 Hostels");
     }
-    lines.push("Order Due Date:  " + orderDate);
+    lines.push(bold("Order Due Date:") + "  " + orderDate);
     lines.push("");
     
-    // Items Table Header
-    lines.push("Sr/No  Product                       Qty   Price   Total");
-    lines.push("--------------------------------------------------------");
+    // Items Table Header - bold header row
+    lines.push(bold("Sr.       Product            Qty   Price   Total"));
+    lines.push("------------------------------------------------");
     
     // Calculate totals
     let subtotal = 0;
@@ -202,33 +206,33 @@ function generateReceiptText(order, items) {
         lines.push(`${srNo}    ${product}   ${qty}  ${price}  ${amount}`);
     });
     
-    lines.push("--------------------------------------------------------");
+    lines.push("------------------------------------------------");
     
-    // Summary Section
+    // Summary Section - bold headings only
     const discountAmount = (subtotal * discountPercent) / 100;
     const netAmount = subtotal - discountAmount;
     const paid = order.payment_status === 'paid' ? netAmount : 0;
     const balance = netAmount - paid;
     
-    lines.push("No of Pieces:     " + totalQty);
-    lines.push("Gross Amount:     " + subtotal.toFixed(0));
-    lines.push("Discount:         " + discountAmount.toFixed(0));
-    lines.push("Net Amount:       " + netAmount.toFixed(0));
-    lines.push("Paid:             " + paid.toFixed(0));
-    lines.push("Balance:          " + balance.toFixed(0));
+    lines.push(bold("No of Pieces:") + "     " + totalQty);
+    lines.push(bold("Gross Amount:") + "     " + subtotal.toFixed(0));
+    lines.push(bold("Discount:") + "         " + discountAmount.toFixed(0));
+    lines.push(bold("Net Amount:") + "       " + netAmount.toFixed(0));
+    lines.push(bold("Paid:") + "             " + paid.toFixed(0));
+    lines.push(bold("Balance:") + "          " + balance.toFixed(0));
     lines.push("");
     
-    // Notes Section
-    lines.push("Note:");
+    // Notes Section - bold heading only
+    lines.push(bold("Note:"));
     lines.push("Thank you for choosing us.");
     lines.push("");
     
-    // Payment Details
-    lines.push("Bank:             Meezan Bank");
-    lines.push("Name:             Awais Amjad");
-    lines.push("Account Number:   2647 0113908048");
-    lines.push("BAN:              PK72 MEZN 0026 4701 1390 8048");
-    lines.push("JazzCash:         0301 04 65 000");
+    // Payment Details - bold headings only
+    lines.push(bold("Bank:") + "             Meezan Bank");
+    lines.push(bold("Name:") + "             Awais Amjad");
+    lines.push(bold("Account Number:") + "   2647 0113908048");
+    lines.push(bold("IBAN:") + "              PK72 MEZN 0026 4701 1390 8048");
+    lines.push(bold("JazzCash:") + "         0301 04 65 000");
     lines.push("");
     lines.push("");
     lines.push("Developer:  Muneeb 0325 6000 110");
