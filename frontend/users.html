@@ -45,7 +45,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="moduleModalTitle">Module Access</h2>
-                <span class="close-modal" onclick="closeModuleModal()">&times;</span>
+                <span class="close-modal" onclick="closeModuleAccessModal()">&times;</span>
             </div>
             <div class="modal-body">
                 <p id="moduleModalUser"></p>
@@ -53,7 +53,7 @@
                     <!-- Module checkboxes will be injected here -->
                 </div>
                 <div class="modal-actions">
-                    <button class="btn-secondary" onclick="closeModuleModal()">Cancel</button>
+                    <button class="btn-secondary" onclick="closeModuleAccessModal()">Cancel</button>
                     <button class="btn-primary" onclick="saveModuleAccess()">Save Access</button>
                 </div>
             </div>
@@ -63,6 +63,7 @@
     <!-- Qt WebChannel script - required for JavaScript-Python communication -->
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
     <script src="js/layout.js"></script>
+    <script src="js/print_utils.js"></script>
     <script src="js/users.js"></script>
 </body>
 

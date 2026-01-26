@@ -204,7 +204,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     addUpdateBtn.addEventListener("click", async () => {
         if (!dbBackend) {
-            alert("Database backend not initialized. Please wait...");
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Database backend not initialized. Please wait...");
+            } else {
+                alert("Database backend not initialized. Please wait...");
+            }
             return;
         }
 
@@ -213,7 +217,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const role = document.getElementById("user-role").value;
 
         if (!username || !password) {
-            alert("Please fill all required fields!");
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Please fill all required fields!");
+            } else {
+                alert("Please fill all required fields!");
+            }
             return;
         }
 
@@ -224,7 +232,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 const result = await safeDbUpdate(sql, [username, role, password, editingId]);
 
                 if (result.error || result.success === false) {
-                    alert("Error updating user: " + (result.error || "Unknown error"));
+                    if (typeof showAlertModal === 'function') {
+                        await showAlertModal("Error updating user: " + (result.error || "Unknown error"));
+                    } else {
+                        alert("Error updating user: " + (result.error || "Unknown error"));
+                    }
                     return;
                 }
 
@@ -237,7 +249,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 const result = await safeDbUpdate(sql, [username, role, password]);
 
                 if (result.error || result.success === false) {
-                    alert("Error adding user: " + (result.error || "Unknown error"));
+                    if (typeof showAlertModal === 'function') {
+                        await showAlertModal("Error adding user: " + (result.error || "Unknown error"));
+                    } else {
+                        alert("Error adding user: " + (result.error || "Unknown error"));
+                    }
                     return;
                 }
             }
@@ -252,7 +268,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         } catch (error) {
             console.error("Error saving user:", error);
-            alert("Error saving user: " + error.message);
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Error saving user: " + error.message);
+            } else {
+                alert("Error saving user: " + error.message);
+            }
         }
     });
 
@@ -268,10 +288,14 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // Edit user
-function editUser(id) {
+async function editUser(id) {
     const user = users.find(u => u.id === id);
     if (!user) {
-        alert("User not found");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("User not found");
+        } else {
+            alert("User not found");
+        }
         return;
     }
 
@@ -293,28 +317,48 @@ function editUser(id) {
 async function deleteUser(id) {
     const user = users.find(u => u.id === id);
     if (!user) {
-        alert("User not found");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("User not found");
+        } else {
+            alert("User not found");
+        }
         return;
     }
 
     // Prevent deletion of admin users
     if (user.role === 'admin') {
-        alert("Cannot delete admin users!");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Cannot delete admin users!");
+        } else {
+            alert("Cannot delete admin users!");
+        }
         return;
     }
 
     // Prevent deletion of current logged-in user
     if (currentUserId && user.id === currentUserId) {
-        alert("You cannot delete your own account!");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("You cannot delete your own account!");
+        } else {
+            alert("You cannot delete your own account!");
+        }
         return;
     }
 
-    if (!confirm(`Are you sure you want to delete user "${user.username}"? This action cannot be undone.`)) {
+    const confirmed = typeof showConfirmModal === 'function'
+        ? await showConfirmModal(`Are you sure you want to delete user "${user.username}"? This action cannot be undone.`)
+        : confirm(`Are you sure you want to delete user "${user.username}"? This action cannot be undone.`);
+    
+    if (!confirmed) {
         return;
     }
 
     if (!dbBackend) {
-        alert("Database backend not initialized. Please wait...");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Database backend not initialized. Please wait...");
+        } else {
+            alert("Database backend not initialized. Please wait...");
+        }
         return;
     }
 
@@ -323,7 +367,11 @@ async function deleteUser(id) {
         const result = await safeDbUpdate(sql, [id]);
 
         if (result.error || result.success === false) {
-            alert("Error deleting user: " + (result.error || "Unknown error"));
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Error deleting user: " + (result.error || "Unknown error"));
+            } else {
+                alert("Error deleting user: " + (result.error || "Unknown error"));
+            }
             return;
         }
 
@@ -339,17 +387,29 @@ async function deleteUser(id) {
             filterUsers();
         }
 
-        alert("User deleted successfully!");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("User deleted successfully!");
+        } else {
+            alert("User deleted successfully!");
+        }
     } catch (error) {
         console.error("Error deleting user:", error);
-        alert("Error deleting user: " + error.message);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error deleting user: " + error.message);
+        } else {
+            alert("Error deleting user: " + error.message);
+        }
     }
 }
 
 // Toggle user status
 async function toggleUserStatus(id, newStatus) {
     if (!dbBackend) {
-        alert("Database backend not initialized. Please wait...");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Database backend not initialized. Please wait...");
+        } else {
+            alert("Database backend not initialized. Please wait...");
+        }
         return;
     }
 
@@ -358,7 +418,11 @@ async function toggleUserStatus(id, newStatus) {
         const result = await safeDbUpdate(sql, [newStatus, id]);
 
         if (result.error || result.success === false) {
-            alert("Error updating user status: " + (result.error || "Unknown error"));
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Error updating user status: " + (result.error || "Unknown error"));
+            } else {
+                alert("Error updating user status: " + (result.error || "Unknown error"));
+            }
             return;
         }
 
@@ -370,7 +434,11 @@ async function toggleUserStatus(id, newStatus) {
         }
     } catch (error) {
         console.error("Error toggling user status:", error);
-        alert("Error updating user status: " + error.message);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error updating user status: " + error.message);
+        } else {
+            alert("Error updating user status: " + error.message);
+        }
     }
 }
 
@@ -397,7 +465,11 @@ function filterUsers() {
 async function openModuleAccessModal(userId) {
     const user = users.find(u => u.id === userId);
     if (!user) {
-        alert("User not found");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("User not found");
+        } else {
+            alert("User not found");
+        }
         return;
     }
 
@@ -437,7 +509,11 @@ async function saveModuleAccess() {
     if (!currentUserIdForModules) return;
 
     if (!dbBackend) {
-        alert("Database backend not initialized. Please wait...");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Database backend not initialized. Please wait...");
+        } else {
+            alert("Database backend not initialized. Please wait...");
+        }
         return;
     }
 
@@ -450,16 +526,28 @@ async function saveModuleAccess() {
         const result = await safeDbUpdate(sql, [moduleAccessJson, currentUserIdForModules]);
 
         if (result.error || result.success === false) {
-            alert("Error updating module access: " + (result.error || "Unknown error"));
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Error updating module access: " + (result.error || "Unknown error"));
+            } else {
+                alert("Error updating module access: " + (result.error || "Unknown error"));
+            }
             return;
         }
 
         await loadUsers();
         closeModuleAccessModal();
-        alert("Module access updated successfully!");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Module access updated successfully!");
+        } else {
+            alert("Module access updated successfully!");
+        }
     } catch (error) {
         console.error("Error saving module access:", error);
-        alert("Error saving module access: " + error.message);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error saving module access: " + error.message);
+        } else {
+            alert("Error saving module access: " + error.message);
+        }
     }
 }
 
