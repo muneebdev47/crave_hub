@@ -77,11 +77,12 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 // Check for hardcoded admin user first
                 if (username === "Admin" && password === "Muneeb@123") {
-                    // Store admin user in localStorage
+                    // Store admin user in localStorage (admin has access to all modules)
                     localStorage.setItem('currentUser', JSON.stringify({
                         id: 0,
                         username: "Admin",
-                        role: "admin"
+                        role: "admin",
+                        module_access: 'all' // Admin has access to all modules
                     }));
 
                     // Redirect to dashboard
@@ -89,8 +90,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     return;
                 }
 
-                // Query user from database
-                const userSql = `SELECT id, username, role, password FROM users WHERE username = ? AND is_active = 1`;
+                // Query user from database (including module_access)
+                const userSql = `SELECT id, username, role, password, module_access FROM users WHERE username = ? AND is_active = 1`;
                 const users = await safeDbQuery(userSql, [username]);
 
                 if (!users || users.length === 0) {
@@ -104,11 +105,23 @@ document.addEventListener("DOMContentLoaded", () => {
                 // For now, we'll do a simple comparison
                 // Note: In a real app, you should hash passwords and compare hashes
                 if (user.password === password) {
+                    // Parse module_access if it exists
+                    let moduleAccess = [];
+                    if (user.module_access) {
+                        try {
+                            moduleAccess = JSON.parse(user.module_access);
+                        } catch (e) {
+                            console.warn("Error parsing module_access:", e);
+                            moduleAccess = [];
+                        }
+                    }
+
                     // Store current user in localStorage
                     localStorage.setItem('currentUser', JSON.stringify({
                         id: user.id,
                         username: user.username,
-                        role: user.role
+                        role: user.role,
+                        module_access: moduleAccess
                     }));
 
                     // Redirect to dashboard
