@@ -116,7 +116,16 @@ MENU_ITEMS = [
 # Starters
 ("Hot Wings", "Starters", 400),
 ("Chicken Spring Rolls", "Starters", 400),
-("Special Platter", "Starters", 900)
+("Special Platter", "Starters", 900),
+# Deals
+("Deal 1", "Deals", 399),
+("Deal 2", "Deals", 750),
+("Deal 3", "Deals", 2699),
+("Deal 4", "Deals", 2499),
+("Deal 5", "Deals", 1450),
+("Deal 6", "Deals", 799),
+("Deal 7", "Deals", 1150),
+("Deal 8", "Deals", 1350)
 ]
 def get_connection():
     """
@@ -187,3 +196,11 @@ def _initialize_db(conn):
         # Database exists, but check if menu items need seeding
         # (in case schema was created manually without menu items)
         _seed_menu_items(conn)
+        
+        # Add discount_percentage column if it doesn't exist (migration)
+        try:
+            cursor.execute("ALTER TABLE orders ADD COLUMN discount_percentage REAL DEFAULT 0")
+            conn.commit()
+        except sqlite3.OperationalError:
+            # Column already exists, ignore
+            pass

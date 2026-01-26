@@ -40,6 +40,36 @@ async function safeDbQuery(sql, params = null) {
     }
 }
 
+// Helper function to safely execute database updates
+async function safeDbUpdate(sql, params) {
+    if (!dbBackend) {
+        console.error("Database backend not initialized");
+        return { error: "Database backend not initialized" };
+    }
+
+    try {
+        const paramsJson = JSON.stringify(params);
+        let response = dbBackend.execute_with_params(sql, paramsJson);
+
+        // Handle Promise if returned
+        if (response && typeof response.then === 'function') {
+            response = await response;
+        }
+
+        // Check if response is a string
+        if (typeof response !== 'string') {
+            console.error("Invalid response type from database:", typeof response, response);
+            return { error: "Invalid response from database" };
+        }
+
+        // Parse JSON
+        return JSON.parse(response || "{}");
+    } catch (error) {
+        console.error("Error executing database update:", error, sql);
+        return { error: error.message };
+    }
+}
+
 // Initialize Qt WebChannel
 function initWebChannel() {
     if (typeof QWebChannel === 'undefined') {
@@ -157,8 +187,9 @@ async function loadChartData(dateFilter) {
             SELECT 
                 CASE 
                     WHEN order_status = 'completed' THEN 'Completed'
+                    WHEN order_status = 'cancelled' THEN 'Cancelled'
                     WHEN order_status = 'pending' OR order_status IS NULL THEN 'Pending'
-                    ELSE 'Other'
+                    ELSE 'Pending'
                 END as status,
                 COUNT(*) as count
             FROM orders
@@ -166,8 +197,9 @@ async function loadChartData(dateFilter) {
             GROUP BY 
                 CASE 
                     WHEN order_status = 'completed' THEN 'Completed'
+                    WHEN order_status = 'cancelled' THEN 'Cancelled'
                     WHEN order_status = 'pending' OR order_status IS NULL THEN 'Pending'
-                    ELSE 'Other'
+                    ELSE 'Pending'
                 END
         `;
         const ordersByStatusData = await safeDbQuery(ordersByStatusSql);
@@ -277,8 +309,34 @@ function renderOrdersByStatusChart(data) {
         ordersByStatusChart.destroy();
     }
 
-    const labels = data.map(item => item.status || 'Unknown');
-    const counts = data.map(item => parseInt(item.count || 0));
+    // Define the three statuses we want to show
+    const statusOrder = ['Completed', 'Pending', 'Cancelled'];
+    const statusColors = {
+        'Completed': { bg: 'rgba(76, 175, 80, 0.8)', border: 'rgba(76, 175, 80, 1)' },  // Green
+        'Pending': { bg: 'rgba(255, 152, 0, 0.8)', border: 'rgba(255, 152, 0, 1)' },      // Orange
+        'Cancelled': { bg: 'rgba(244, 67, 54, 0.8)', border: 'rgba(244, 67, 54, 1)' }    // Red
+    };
+
+    // Create a map from the data
+    const statusMap = {};
+    data.forEach(item => {
+        const status = item.status || 'Pending';
+        statusMap[status] = parseInt(item.count || 0);
+    });
+
+    // Build labels and counts in the correct order, ensuring all three statuses are present
+    const labels = [];
+    const counts = [];
+    const backgroundColors = [];
+    const borderColors = [];
+
+    statusOrder.forEach(status => {
+        labels.push(status);
+        counts.push(statusMap[status] || 0);
+        const colors = statusColors[status];
+        backgroundColors.push(colors.bg);
+        borderColors.push(colors.border);
+    });
 
     ordersByStatusChart = new Chart(ctx, {
         type: 'pie',
@@ -287,16 +345,8 @@ function renderOrdersByStatusChart(data) {
             datasets: [{
                 label: 'Orders',
                 data: counts,
-                backgroundColor: [
-                    'rgba(76, 175, 80, 0.8)',
-                    'rgba(255, 152, 0, 0.8)',
-                    'rgba(158, 158, 158, 0.8)'
-                ],
-                borderColor: [
-                    'rgba(76, 175, 80, 1)',
-                    'rgba(255, 152, 0, 1)',
-                    'rgba(158, 158, 158, 1)'
-                ],
+                backgroundColor: backgroundColors,
+                borderColor: borderColors,
                 borderWidth: 2
             }]
         },
@@ -482,7 +532,7 @@ async function loadOrdersTable(dateFilter) {
         tbody.innerHTML = "";
 
         if (!orders || orders.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #aaa;">No orders found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #aaa;">No orders found</td></tr>';
             return;
         }
 
@@ -508,8 +558,16 @@ async function loadOrdersTable(dateFilter) {
 
             const orderStatus = order.order_status || 'pending';
             const paymentStatus = order.payment_status || 'pending';
-            const orderStatusClass = orderStatus === 'completed' ? 'status-completed' : 'status-pending';
+            let orderStatusClass = 'status-pending';
+            if (orderStatus === 'completed') {
+                orderStatusClass = 'status-completed';
+            } else if (orderStatus === 'cancelled') {
+                orderStatusClass = 'status-cancelled';
+            }
             const paymentStatusClass = paymentStatus === 'paid' ? 'status-completed' : 'status-pending';
+
+            // Only show cancel button if order is not completed or cancelled
+            const canCancel = orderStatus !== 'completed' && orderStatus !== 'cancelled';
 
             tr.innerHTML = `
                 <td>#${order.id}</td>
@@ -519,6 +577,9 @@ async function loadOrdersTable(dateFilter) {
                 <td>Rs. ${parseFloat(order.total).toFixed(2)}</td>
                 <td><span class="${orderStatusClass}">${orderStatus.charAt(0).toUpperCase() + orderStatus.slice(1)}</span></td>
                 <td><span class="${paymentStatusClass}">${paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}</span></td>
+                <td>
+                    ${canCancel ? `<button class="btn-danger" onclick="cancelOrder(${order.id})" style="padding: 5px 10px; font-size: 12px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Cancel Order">✕</button>` : ''}
+                </td>
             `;
             tbody.appendChild(tr);
         });
@@ -527,6 +588,45 @@ async function loadOrdersTable(dateFilter) {
         console.error("Error loading orders table:", error);
     }
 }
+
+// Cancel order function
+async function cancelOrder(orderId) {
+    if (!orderId || !dbBackend) {
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Invalid order or database not initialized");
+        } else {
+            alert("Invalid order or database not initialized");
+        }
+        return;
+    }
+
+    const confirmed = await showConfirmModal("Are you sure you want to cancel this order? This action cannot be undone.");
+    if (!confirmed) return;
+
+    try {
+        const updateStatusSql = `UPDATE orders SET order_status = 'cancelled', payment_status = 'cancelled' WHERE id = ?`;
+        await safeDbUpdate(updateStatusSql, [orderId]);
+
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Order cancelled successfully!");
+        } else {
+            alert("Order cancelled successfully!");
+        }
+
+        // Reload finance data
+        loadFinanceData();
+    } catch (error) {
+        console.error("Error cancelling order:", error);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error cancelling order: " + error.message);
+        } else {
+            alert("Error cancelling order: " + error.message);
+        }
+    }
+}
+
+// Make cancelOrder globally accessible
+window.cancelOrder = cancelOrder;
 
 // Event listeners
 document.addEventListener("DOMContentLoaded", () => {

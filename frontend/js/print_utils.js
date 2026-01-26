@@ -114,52 +114,118 @@ function showAlertModal(message) {
 function generateReceiptText(order, items) {
     const lines = [];
     const date = new Date(order.created_at);
-    const dateStr = date.toLocaleDateString();
-    const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-    // Header
-    lines.push("==================================");
-    lines.push("      CRAVEHUB CAFE");
-    lines.push("==================================");
+    const printDate = new Date();
+    
+    // Format dates
+    const formatDate = (d) => {
+        const day = String(d.getDate()).padStart(2, '0');
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = months[d.getMonth()];
+        const year = d.getFullYear();
+        return `${day}-${month}-${year}`;
+    };
+    
+    const formatTime = (d) => {
+        let hours = d.getHours();
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        return `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+    };
+    
+    const orderDate = formatDate(date);
+    const printDateTime = `${formatDate(printDate)} ${formatTime(printDate)}`;
+    const orderNo = `CHC-${String(order.id).padStart(3, '0')}`;
+    
+    // Header with logo area
+    // ASCII art logo (works on all thermal printers)
+    lines.push("    ╔═════════════════╗");
+    lines.push("    ║   CRAVEHUB CAFE ║");
+    lines.push("    ╚═════════════════╝");
     lines.push("");
+    lines.push("Interloop Apparel # 2 Hostels");
+    lines.push("+92 304 04 65 000");
     
-    // Order Info
-    lines.push(`Receipt #: ${String(order.id).padStart(6, '0')}`);
-    lines.push(`Date: ${dateStr} ${timeStr}`);
-    lines.push(`Type: ${order.order_type || 'Takeaway'}`);
+    // Order Information Section
+    lines.push("Order No:        " + orderNo);
+    lines.push("Order Date:      " + orderDate);
+    lines.push("Print Date & Time: " + printDateTime);
+    lines.push("Sales Associate:  CRAVEHUB");
     
+    // Customer information
     if (order.customer_name) {
-        lines.push(`Customer: ${order.customer_name}`);
-    }
-    if (order.customer_phone) {
-        lines.push(`Phone: ${order.customer_phone}`);
-    }
-    if (order.table_number) {
-        lines.push(`Table: ${order.table_number}`);
+        lines.push("Customer:        " + (order.customer_name.startsWith('Mr. ') || order.customer_name.startsWith('Ms. ') ? order.customer_name : `Mr. ${order.customer_name}`));
+    } else {
+        lines.push("Customer:        Mr. Walking Customer");
     }
     
-    lines.push("----------------------------------");
-    lines.push("ITEM                QTY    AMOUNT");
-    lines.push("----------------------------------");
-
+    if (order.customer_phone) {
+        lines.push("Phone:           " + order.customer_phone);
+    }
+    
+    if (order.table_number) {
+        lines.push("Table:           " + order.table_number);
+    }
+    
+    // Address (use customer address if available, otherwise default)
+    const address = order.customer_address || "Interloop Apparel #2 Hostels";
+    lines.push("Address:         " + address);
+    lines.push("Order Due Date:  " + orderDate);
+    lines.push("");
+    
+    // Items Table Header
+    lines.push("Sr/No  Product                       Qty   Price   Total");
+    lines.push("--------------------------------------------------------");
+    
+    // Calculate totals
+    let subtotal = 0;
+    let totalQty = 0;
+    const discountPercent = order.discount_percentage || 0;
+    
     // Items
-    items.forEach(item => {
-        const itemTotal = (item.price * item.quantity).toFixed(2);
-        const name = item.name.length > 18 ? item.name.substring(0, 15) + '...' : item.name;
+    items.forEach((item, index) => {
+        const srNo = String(index + 1).padStart(2);
+        const product = item.name.length > 18 ? item.name.substring(0, 15) + '...' : item.name.padEnd(15);
         const qty = String(item.quantity).padStart(3);
-        const total = `Rs.${itemTotal}`.padStart(10);
-        lines.push(`${name.padEnd(20)}${qty}${total}`);
+        const price = String(item.price).padStart(5);
+        const itemTotal = (item.price * item.quantity);
+        const amount = String(itemTotal.toFixed(0)).padStart(6);
+        
+        subtotal += itemTotal;
+        totalQty += item.quantity;
+        
+        lines.push(`${srNo}    ${product}   ${qty}  ${price}  ${amount}`);
     });
-
-    // Total
-    lines.push("----------------------------------");
-    lines.push(`TOTAL:${' '.repeat(20)}Rs. ${parseFloat(order.total).toFixed(2)}`);
-    lines.push("==================================");
+    
+    lines.push("--------------------------------------------------------");
+    
+    // Summary Section
+    const discountAmount = (subtotal * discountPercent) / 100;
+    const netAmount = subtotal - discountAmount;
+    const paid = order.payment_status === 'paid' ? netAmount : 0;
+    const balance = netAmount - paid;
+    
+    lines.push("No of Pieces:     " + totalQty);
+    lines.push("Gross Amount:     " + subtotal.toFixed(0));
+    lines.push("Discount:         " + discountAmount.toFixed(0));
+    lines.push("Net Amount:       " + netAmount.toFixed(0));
+    lines.push("Paid:             " + paid.toFixed(0));
+    lines.push("Balance:          " + balance.toFixed(0));
     lines.push("");
-    lines.push("   Thank you for your order!");
+    
+    // Notes Section
+    lines.push("Note:");
+    lines.push("Thank you for choosing us.");
     lines.push("");
-    lines.push("  Developed by Muneeb");
-    lines.push("   Phone: 03256000110");
+    
+    // Payment Details
+    lines.push("Bank:             Meezan Bank");
+    lines.push("Name:             Awais Amjad");
+    lines.push("Account Number:   2647 0113908048");
+    lines.push("BAN:              PK72 MEZN 0026 4701 1390 8048");
+    lines.push("JazzCash:         0301 04 65 000");
+    lines.push("");
     lines.push("");
     lines.push(""); // Extra blank lines for cutting
 

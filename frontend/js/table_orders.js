@@ -203,7 +203,19 @@ function openNewOrderModal(tableNumber) {
             <div class="order-summary-section">
                 <h3>Order Summary</h3>
                 <div id="selectedItemsList" class="selected-items-list"></div>
+                <div class="discount-section" style="margin: 15px 0;">
+                    <label for="discountInput" style="color: white; display: block; margin-bottom: 5px; font-size: 14px;">Discount (%):</label>
+                    <input type="number" id="discountInput" min="0" max="100" step="0.01" value="0" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px;" oninput="updateOrderSummary()">
+                </div>
                 <div class="order-total">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span style="color: #aaa;">Subtotal:</span>
+                        <span style="color: #aaa;" id="subtotalAmount">Rs. 0.00</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;" id="discountRow" style="display: none;">
+                        <span style="color: #aaa;">Discount:</span>
+                        <span style="color: #4caf50;" id="discountAmount">Rs. 0.00</span>
+                    </div>
                     <strong>Total: <span id="orderTotal">Rs. 0.00</span></strong>
                 </div>
                 <div class="modal-actions">
@@ -250,13 +262,18 @@ async function openOrderModal(tableNumber, order) {
     const modalTitle = document.getElementById("modalTitle");
     const modalContent = document.getElementById("modalContent");
 
+    const orderStatus = order.order_status || 'pending';
+    const statusClass = orderStatus === 'completed' ? 'status-completed' : (orderStatus === 'cancelled' ? 'status-cancelled' : 'status-pending');
+    const statusText = orderStatus === 'completed' ? 'Completed' : (orderStatus === 'cancelled' ? 'Cancelled' : 'Pending');
+    const canCancel = orderStatus !== 'completed' && orderStatus !== 'cancelled';
+
     modalTitle.textContent = `Table ${tableNumber} - Order #${order.id}`;
     modalContent.innerHTML = `
         <div class="order-details-section" style="margin-bottom: 20px;">
             <div class="order-info">
                 <p><strong>Order ID:</strong> #${order.id}</p>
                 <p><strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}</p>
-                <p><strong>Status:</strong> <span class="status-pending">Pending</span></p>
+                <p><strong>Status:</strong> <span class="${statusClass}">${statusText}</span></p>
             </div>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
@@ -270,13 +287,26 @@ async function openOrderModal(tableNumber, order) {
             <div class="order-summary-section">
                 <h3 style="color: white;">Order Items</h3>
                 <div id="selectedItemsList" class="selected-items-list"></div>
+                <div class="discount-section" style="margin: 15px 0;">
+                    <label for="discountInput" style="color: white; display: block; margin-bottom: 5px; font-size: 14px;">Discount (%):</label>
+                    <input type="number" id="discountInput" min="0" max="100" step="0.01" value="${order.discount_percentage || 0}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px;" oninput="updateOrderSummary()">
+                </div>
                 <div class="order-total">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span style="color: #aaa;">Subtotal:</span>
+                        <span style="color: #aaa;" id="subtotalAmount">Rs. 0.00</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;" id="discountRow" style="display: none;">
+                        <span style="color: #aaa;">Discount:</span>
+                        <span style="color: #4caf50;" id="discountAmount">Rs. 0.00</span>
+                    </div>
                     <strong>Total: <span id="orderTotal">Rs. ${parseFloat(order.total).toFixed(2)}</span></strong>
                 </div>
                 <div class="modal-actions">
                     <button class="btn-secondary" onclick="closeOrderModal()">Close</button>
-                    <button class="btn-warning" onclick="updateOrder()">Update Order</button>
-                    <button class="btn-success" onclick="markOrderComplete()">Mark Complete</button>
+                    ${canCancel ? `<button class="btn-warning" onclick="updateOrder()">Update Order</button>` : ''}
+                    ${canCancel ? `<button class="btn-danger" onclick="cancelOrder(${order.id})" style="background-color: #f44336; color: white; border: none; border-radius: 4px; padding: 8px 16px; cursor: pointer; margin-right: 5px;" title="Cancel Order">✕ Cancel</button>` : ''}
+                    ${canCancel ? `<button class="btn-success" onclick="markOrderComplete()">Mark Complete</button>` : ''}
                 </div>
             </div>
         </div>
@@ -317,6 +347,7 @@ function filterMenuItems() {
 
 // Make filterMenuItems globally accessible
 window.filterMenuItems = filterMenuItems;
+window.cancelOrder = cancelOrder;
 
 // Render menu items
 function renderMenuItems() {
@@ -368,20 +399,27 @@ function toggleMenuItem(menuItemId) {
 // Update order summary
 function updateOrderSummary() {
     const selectedItemsList = document.getElementById("selectedItemsList");
+    const subtotalEl = document.getElementById("subtotalAmount");
+    const discountInput = document.getElementById("discountInput");
+    const discountAmountEl = document.getElementById("discountAmount");
+    const discountRow = document.getElementById("discountRow");
     const orderTotal = document.getElementById("orderTotal");
 
     if (!selectedItemsList) return;
 
     if (Object.keys(selectedItems).length === 0) {
         selectedItemsList.innerHTML = '<p class="empty-message">No items selected</p>';
+        if (subtotalEl) subtotalEl.textContent = 'Rs. 0.00';
+        if (discountAmountEl) discountAmountEl.textContent = 'Rs. 0.00';
+        if (discountRow) discountRow.style.display = 'none';
         if (orderTotal) orderTotal.textContent = 'Rs. 0.00';
         return;
     }
 
-    let total = 0;
+    let subtotal = 0;
     selectedItemsList.innerHTML = Object.values(selectedItems).map(item => {
         const itemTotal = item.price * item.qty;
-        total += itemTotal;
+        subtotal += itemTotal;
         return `
             <div class="selected-item-row">
                 <div class="item-info">
@@ -398,6 +436,15 @@ function updateOrderSummary() {
         `;
     }).join('');
 
+    // Get discount percentage
+    const discountPercent = discountInput ? parseFloat(discountInput.value) || 0 : 0;
+    const discountAmount = (subtotal * discountPercent) / 100;
+    const total = subtotal - discountAmount;
+
+    // Update display
+    if (subtotalEl) subtotalEl.textContent = `Rs. ${subtotal.toFixed(2)}`;
+    if (discountAmountEl) discountAmountEl.textContent = `-Rs. ${discountAmount.toFixed(2)}`;
+    if (discountRow) discountRow.style.display = discountPercent > 0 ? 'flex' : 'none';
     if (orderTotal) orderTotal.textContent = `Rs. ${total.toFixed(2)}`;
 }
 
@@ -459,15 +506,21 @@ async function saveOrder() {
     }
 
     try {
-        // Calculate total
-        const total = Object.values(selectedItems).reduce((sum, item) => {
+        // Calculate subtotal
+        const subtotal = Object.values(selectedItems).reduce((sum, item) => {
             return sum + (item.price * item.qty);
         }, 0);
 
+        // Get discount
+        const discountInput = document.getElementById("discountInput");
+        const discountPercent = discountInput ? parseFloat(discountInput.value) || 0 : 0;
+        const discountAmount = (subtotal * discountPercent) / 100;
+        const total = subtotal - discountAmount;
+
         // Insert order with table number
         const now = new Date().toISOString();
-        const insertOrderSql = `INSERT INTO orders (order_type, total, created_at, table_number, order_status, payment_status) VALUES (?, ?, ?, ?, ?, ?)`;
-        const result = await safeDbUpdate(insertOrderSql, ['Table', total, now, currentTableNumber, 'pending', 'pending']);
+        const insertOrderSql = `INSERT INTO orders (order_type, total, discount_percentage, created_at, table_number, order_status, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+        const result = await safeDbUpdate(insertOrderSql, ['Table', total, discountPercent, now, currentTableNumber, 'pending', 'pending']);
 
         console.log("Order insert result:", result);
         console.log("Result type:", typeof result);
@@ -599,14 +652,20 @@ async function updateOrder() {
     }
 
     try {
-        // Calculate new total
-        const total = Object.values(selectedItems).reduce((sum, item) => {
+        // Calculate subtotal
+        const subtotal = Object.values(selectedItems).reduce((sum, item) => {
             return sum + (item.price * item.qty);
         }, 0);
 
+        // Get discount
+        const discountInput = document.getElementById("discountInput");
+        const discountPercent = discountInput ? parseFloat(discountInput.value) || 0 : 0;
+        const discountAmount = (subtotal * discountPercent) / 100;
+        const total = subtotal - discountAmount;
+
         // Update order total
-        const updateOrderSql = `UPDATE orders SET total = ? WHERE id = ?`;
-        await safeDbUpdate(updateOrderSql, [total, currentOrderId]);
+        const updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ? WHERE id = ?`;
+        await safeDbUpdate(updateOrderSql, [total, discountPercent, currentOrderId]);
 
         // Delete existing order items
         const deleteItemsSql = `DELETE FROM order_items WHERE order_id = ?`;
@@ -685,6 +744,43 @@ async function markOrderComplete() {
 }
 
 // Close modal
+// Cancel order function
+async function cancelOrder(orderId) {
+    if (!orderId || !(window.dbBackend || dbBackend)) {
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Invalid order or database not initialized");
+        } else {
+            alert("Invalid order or database not initialized");
+        }
+        return;
+    }
+
+    const confirmed = await showConfirmModal("Are you sure you want to cancel this order? This action cannot be undone.");
+    if (!confirmed) return;
+
+    try {
+        const updateStatusSql = `UPDATE orders SET order_status = 'cancelled', payment_status = 'cancelled' WHERE id = ?`;
+        await safeDbUpdate(updateStatusSql, [orderId]);
+
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Order cancelled successfully!");
+        } else {
+            alert("Order cancelled successfully!");
+        }
+
+        // Close modal and reload table orders
+        closeOrderModal();
+        loadTableOrders();
+    } catch (error) {
+        console.error("Error cancelling order:", error);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error cancelling order: " + error.message);
+        } else {
+            alert("Error cancelling order: " + error.message);
+        }
+    }
+}
+
 function closeOrderModal() {
     const modal = document.getElementById("orderModal");
     if (modal) {

@@ -202,12 +202,12 @@ async function loadRecentOrders() {
 
     tbody.innerHTML = "";
 
-    if (!orders || orders.length === 0) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = '<td colspan="6" style="text-align: center; color: white; padding: 20px;">No orders found</td>';
-        tbody.appendChild(tr);
-        return;
-    }
+        if (!orders || orders.length === 0) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = '<td colspan="7" style="text-align: center; color: white; padding: 20px;">No orders found</td>';
+            tbody.appendChild(tr);
+            return;
+        }
 
     orders.forEach(order => {
         const tr = document.createElement("tr");
@@ -217,8 +217,15 @@ async function loadRecentOrders() {
         const dateStr = date.toLocaleDateString();
         const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         const status = order.order_status || 'pending';
-        const statusClass = status === 'completed' ? 'status-completed' : 'status-pending';
-        const statusText = status === 'completed' ? 'Completed' : 'Pending';
+        let statusClass = 'status-pending';
+        let statusText = 'Pending';
+        if (status === 'completed') {
+            statusClass = 'status-completed';
+            statusText = 'Completed';
+        } else if (status === 'cancelled') {
+            statusClass = 'status-cancelled';
+            statusText = 'Cancelled';
+        }
 
         // Determine customer/table display
         let customerTableDisplay = '-';
@@ -234,6 +241,9 @@ async function loadRecentOrders() {
             customerTableDisplay = order.customer_name;
         }
 
+        // Only show cancel button if order is not completed or cancelled
+        const canCancel = status !== 'completed' && status !== 'cancelled';
+
         tr.innerHTML = `
             <td>#${order.id}</td>
             <td>${order.order_type || '-'}</td>
@@ -241,6 +251,10 @@ async function loadRecentOrders() {
             <td>Rs. ${parseFloat(order.total || 0).toFixed(2)}</td>
             <td><span class="${statusClass}">${statusText}</span></td>
             <td>${dateStr} ${timeStr}</td>
+            <td>
+                <button class="btn-warning" onclick="event.stopPropagation(); openEditOrderModal(${order.id})" style="padding: 5px 10px; font-size: 12px; margin-right: 5px;">Edit</button>
+                ${canCancel ? `<button class="btn-danger" onclick="event.stopPropagation(); cancelOrder(${order.id})" style="padding: 5px 10px; font-size: 12px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Cancel Order">✕</button>` : ''}
+            </td>
         `;
         tr.addEventListener("click", () => openEditOrderModal(order.id));
         tbody.appendChild(tr);
@@ -670,7 +684,19 @@ async function openEditOrderModal(orderId) {
                 <div class="takeaway-order-summary">
                     <h3>Order Items</h3>
                     <div id="selectedItemsListModal" class="selected-items-list"></div>
+                    <div class="discount-section" style="margin: 15px 0;">
+                        <label for="discountInputModal" style="color: white; display: block; margin-bottom: 5px; font-size: 14px;">Discount (%):</label>
+                        <input type="number" id="discountInputModal" min="0" max="100" step="0.01" value="${order.discount_percentage || 0}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px;" oninput="updateOrderSummaryModal()">
+                    </div>
                     <div class="order-total">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="color: #aaa;">Subtotal:</span>
+                            <span style="color: #aaa;" id="subtotalAmountModal">Rs. 0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;" id="discountRowModal" style="display: none;">
+                            <span style="color: #aaa;">Discount:</span>
+                            <span style="color: #4caf50;" id="discountAmountModal">Rs. 0.00</span>
+                        </div>
                         <strong>Total: <span id="orderTotal">Rs. ${parseFloat(order.total || 0).toFixed(2)}</span></strong>
                     </div>
                     <div class="modal-actions">
@@ -752,20 +778,27 @@ function toggleMenuItem(menuItemId) {
 // Update order summary in modal
 function updateOrderSummaryModal() {
     const selectedItemsList = document.getElementById("selectedItemsListModal");
+    const subtotalEl = document.getElementById("subtotalAmountModal");
+    const discountInput = document.getElementById("discountInputModal");
+    const discountAmountEl = document.getElementById("discountAmountModal");
+    const discountRow = document.getElementById("discountRowModal");
     const orderTotal = document.getElementById("orderTotal");
 
     if (!selectedItemsList) return;
 
     if (Object.keys(selectedItems).length === 0) {
         selectedItemsList.innerHTML = '<p class="empty-message">No items selected</p>';
+        if (subtotalEl) subtotalEl.textContent = 'Rs. 0.00';
+        if (discountAmountEl) discountAmountEl.textContent = 'Rs. 0.00';
+        if (discountRow) discountRow.style.display = 'none';
         if (orderTotal) orderTotal.textContent = 'Rs. 0.00';
         return;
     }
 
-    let total = 0;
+    let subtotal = 0;
     selectedItemsList.innerHTML = Object.values(selectedItems).map(item => {
         const itemTotal = parseFloat(item.price) * item.qty;
-        total += itemTotal;
+        subtotal += itemTotal;
         const itemId = item.id || 0;
         return `
             <div class="selected-item-row">
@@ -783,6 +816,15 @@ function updateOrderSummaryModal() {
         `;
     }).join('');
 
+    // Get discount percentage
+    const discountPercent = discountInput ? parseFloat(discountInput.value) || 0 : 0;
+    const discountAmount = (subtotal * discountPercent) / 100;
+    const total = subtotal - discountAmount;
+
+    // Update display
+    if (subtotalEl) subtotalEl.textContent = `Rs. ${subtotal.toFixed(2)}`;
+    if (discountAmountEl) discountAmountEl.textContent = `-Rs. ${discountAmount.toFixed(2)}`;
+    if (discountRow) discountRow.style.display = discountPercent > 0 ? 'flex' : 'none';
     if (orderTotal) orderTotal.textContent = `Rs. ${total.toFixed(2)}`;
 }
 
@@ -851,10 +893,16 @@ async function updateOrder() {
         const customerName = editCustomerNameInput ? editCustomerNameInput.value.trim() : null;
         const customerPhone = editCustomerPhoneInput ? editCustomerPhoneInput.value.trim() : null;
 
-        // Calculate new total
-        const total = Object.values(selectedItems).reduce((sum, item) => {
+        // Calculate subtotal
+        const subtotal = Object.values(selectedItems).reduce((sum, item) => {
             return sum + (item.price * item.qty);
         }, 0);
+
+        // Get discount
+        const discountInput = document.getElementById("discountInputModal");
+        const discountPercent = discountInput ? parseFloat(discountInput.value) || 0 : 0;
+        const discountAmount = (subtotal * discountPercent) / 100;
+        const total = subtotal - discountAmount;
 
         // Build update query based on order type
         let updateOrderSql;
@@ -871,16 +919,16 @@ async function updateOrder() {
 
         if (order.order_type === 'Table') {
             // Table orders don't have customer_name/phone
-            updateOrderSql = `UPDATE orders SET total = ? WHERE id = ?`;
-            updateParams = [total, currentOrderId];
+            updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ? WHERE id = ?`;
+            updateParams = [total, discountPercent, currentOrderId];
         } else {
             // Takeaway/Delivery orders have customer_name
             if (customerPhone !== null) {
-                updateOrderSql = `UPDATE orders SET total = ?, customer_name = ?, customer_phone = ? WHERE id = ?`;
-                updateParams = [total, customerName, customerPhone, currentOrderId];
+                updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ?, customer_phone = ? WHERE id = ?`;
+                updateParams = [total, discountPercent, customerName, customerPhone, currentOrderId];
             } else {
-                updateOrderSql = `UPDATE orders SET total = ?, customer_name = ? WHERE id = ?`;
-                updateParams = [total, customerName, currentOrderId];
+                updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ? WHERE id = ?`;
+                updateParams = [total, discountPercent, customerName, currentOrderId];
             }
         }
 
@@ -1028,7 +1076,44 @@ async function toggleOrderStatus() {
 window.openEditOrderModal = openEditOrderModal;
 window.closeOrderModal = closeOrderModal;
 window.updateOrder = updateOrder;
+// Cancel order function
+async function cancelOrder(orderId) {
+    if (!orderId || !(window.dbBackend || dbBackend)) {
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Invalid order or database not initialized");
+        } else {
+            alert("Invalid order or database not initialized");
+        }
+        return;
+    }
+
+    const confirmed = await showConfirmModal("Are you sure you want to cancel this order? This action cannot be undone.");
+    if (!confirmed) return;
+
+    try {
+        const updateStatusSql = `UPDATE orders SET order_status = 'cancelled', payment_status = 'cancelled' WHERE id = ?`;
+        await safeDbUpdate(updateStatusSql, [orderId]);
+
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Order cancelled successfully!");
+        } else {
+            alert("Order cancelled successfully!");
+        }
+
+        // Reload orders
+        loadRecentOrders();
+    } catch (error) {
+        console.error("Error cancelling order:", error);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error cancelling order: " + error.message);
+        } else {
+            alert("Error cancelling order: " + error.message);
+        }
+    }
+}
+
 window.toggleOrderStatus = toggleOrderStatus;
+window.cancelOrder = cancelOrder;
 window.filterMenuItems = filterMenuItems;
 window.toggleMenuItem = toggleMenuItem;
 window.increaseQuantityModal = increaseQuantityModal;

@@ -201,20 +201,18 @@ function removeItem(id) {
 
 function renderSelectedItems() {
     const selectedItemsList = document.getElementById("selectedItemsList");
-    const totalAmountEl = document.getElementById("totalAmount");
-
     if (!selectedItemsList) return;
 
     if (Object.keys(selectedItems).length === 0) {
         selectedItemsList.innerHTML = '<p class="empty-message">No items selected</p>';
-        if (totalAmountEl) totalAmountEl.textContent = '0.00';
+        updateTotalWithDiscount();
         return;
     }
 
-    let total = 0;
+    let subtotal = 0;
     selectedItemsList.innerHTML = Object.values(selectedItems).map(item => {
         const itemTotal = parseFloat(item.price) * item.qty;
-        total += itemTotal;
+        subtotal += itemTotal;
         const itemId = item.id || 0;
         return `
             <div class="selected-item-row">
@@ -232,10 +230,39 @@ function renderSelectedItems() {
         `;
     }).join('');
 
+    updateTotalWithDiscount();
+}
+
+// Update total with discount calculation
+function updateTotalWithDiscount() {
+    const subtotalEl = document.getElementById("subtotalAmount");
+    const discountInput = document.getElementById("discountInput");
+    const discountAmountEl = document.getElementById("discountAmount");
+    const discountRow = document.getElementById("discountRow");
+    const totalAmountEl = document.getElementById("totalAmount");
+
+    // Calculate subtotal
+    let subtotal = 0;
+    Object.values(selectedItems).forEach(item => {
+        subtotal += parseFloat(item.price) * item.qty;
+    });
+
+    // Get discount percentage
+    const discountPercent = discountInput ? parseFloat(discountInput.value) || 0 : 0;
+    const discountAmount = (subtotal * discountPercent) / 100;
+    const total = subtotal - discountAmount;
+
+    // Update display
+    if (subtotalEl) subtotalEl.textContent = `Rs. ${subtotal.toFixed(2)}`;
+    if (discountAmountEl) discountAmountEl.textContent = `-Rs. ${discountAmount.toFixed(2)}`;
+    if (discountRow) discountRow.style.display = discountPercent > 0 ? 'flex' : 'none';
     if (totalAmountEl) totalAmountEl.textContent = total.toFixed(2);
 }
 
-// Quantity controls
+// Make function globally accessible
+window.updateTotalWithDiscount = updateTotalWithDiscount;
+
+// Quantity controls - update total when quantity changes
 function increaseQuantity(menuItemId) {
     if (selectedItems[menuItemId]) {
         selectedItems[menuItemId].qty += 1;
@@ -267,7 +294,7 @@ function decreaseQuantity(menuItemId) {
 }
 
 // Save order
-async function saveOrder(orderType, total) {
+async function saveOrder(orderType, total, discountPercent = 0) {
     if (!(window.dbBackend || dbBackend)) {
         if (typeof showAlertModal === 'function') {
             await showAlertModal("Database not initialized");
@@ -280,9 +307,9 @@ async function saveOrder(orderType, total) {
     try {
         const customerName = customerNameInput ? customerNameInput.value.trim() : '';
         const now = new Date().toISOString();
-        const insertOrderSql = `INSERT INTO orders (order_type, total, created_at, customer_name, customer_phone, order_status, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+        const insertOrderSql = `INSERT INTO orders (order_type, total, discount_percentage, created_at, customer_name, customer_phone, order_status, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
         const customerPhone = customerPhoneInput ? customerPhoneInput.value.trim() : '';
-        const result = await safeDbUpdate(insertOrderSql, [orderType, total, now, customerName, customerPhone, 'pending', 'pending']);
+        const result = await safeDbUpdate(insertOrderSql, [orderType, total, discountPercent, now, customerName, customerPhone, 'pending', 'pending']);
 
         console.log("Order insert result:", result);
 
@@ -435,8 +462,18 @@ async function loadDeliveryOrders() {
             const dateStr = date.toLocaleDateString();
             const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
             const status = order.order_status || 'pending';
-            const statusClass = status === 'completed' ? 'status-completed' : 'status-pending';
-            const statusText = status === 'completed' ? 'Completed' : 'Pending';
+            let statusClass = 'status-pending';
+            let statusText = 'Pending';
+            if (status === 'completed') {
+                statusClass = 'status-completed';
+                statusText = 'Completed';
+            } else if (status === 'cancelled') {
+                statusClass = 'status-cancelled';
+                statusText = 'Cancelled';
+            }
+
+            // Only show cancel button if order is not completed or cancelled
+            const canCancel = status !== 'completed' && status !== 'cancelled';
 
             tr.innerHTML = `
                 <td>#${order.id}</td>
@@ -446,7 +483,8 @@ async function loadDeliveryOrders() {
                 <td>Rs. ${parseFloat(order.total || 0).toFixed(2)}</td>
                 <td><span class="${statusClass}">${statusText}</span></td>
                 <td>
-                    <button class="btn-warning" onclick="openEditOrderModal(${order.id})" style="padding: 5px 10px; font-size: 12px;">Edit</button>
+                    <button class="btn-warning" onclick="openEditOrderModal(${order.id})" style="padding: 5px 10px; font-size: 12px; margin-right: 5px;">Edit</button>
+                    ${canCancel ? `<button class="btn-danger" onclick="cancelOrder(${order.id})" style="padding: 5px 10px; font-size: 12px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Cancel Order">✕</button>` : ''}
                 </td>
             `;
             tbody.appendChild(tr);
@@ -534,21 +572,31 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Calculate total
-        let total = 0;
+        // Calculate subtotal
+        let subtotal = 0;
         Object.values(selectedItems).forEach(item => {
-            total += parseFloat(item.price) * item.qty;
+            subtotal += parseFloat(item.price) * item.qty;
         });
+
+        // Get discount
+        const discountInput = document.getElementById("discountInput");
+        const discountPercent = discountInput ? parseFloat(discountInput.value) || 0 : 0;
+        const discountAmount = (subtotal * discountPercent) / 100;
+        const total = subtotal - discountAmount;
 
         let orderSummary = `Customer: ${customerName}\nPhone: ${customerPhone}\n\n`;
         Object.values(selectedItems).forEach(item => {
             const itemTotal = parseFloat(item.price) * item.qty;
             orderSummary += `${item.name} x${item.qty} = Rs. ${itemTotal.toFixed(2)}\n`;
         });
+        orderSummary += `\nSubtotal: Rs. ${subtotal.toFixed(2)}`;
+        if (discountPercent > 0) {
+            orderSummary += `\nDiscount (${discountPercent}%): -Rs. ${discountAmount.toFixed(2)}`;
+        }
         orderSummary += `\nTotal: Rs. ${total.toFixed(2)}`;
 
         const confirmed = await showConfirmModal(orderSummary + "\n\nConfirm order?");
-        if (confirmed) await saveOrder("Delivery", total);
+        if (confirmed) await saveOrder("Delivery", total, discountPercent);
     });
 
     waitForWebChannel();
@@ -630,7 +678,19 @@ async function openEditOrderModal(orderId) {
                 <div class="takeaway-order-summary">
                     <h3>Order Summary</h3>
                     <div id="selectedItemsListModal" class="selected-items-list"></div>
+                    <div class="discount-section" style="margin: 15px 0;">
+                        <label for="discountInputModal" style="color: white; display: block; margin-bottom: 5px; font-size: 14px;">Discount (%):</label>
+                        <input type="number" id="discountInputModal" min="0" max="100" step="0.01" value="${order.discount_percentage || 0}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px;" oninput="updateOrderSummaryModal()">
+                    </div>
                     <div class="order-total">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="color: #aaa;">Subtotal:</span>
+                            <span style="color: #aaa;" id="subtotalAmountModal">Rs. 0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;" id="discountRowModal" style="display: none;">
+                            <span style="color: #aaa;">Discount:</span>
+                            <span style="color: #4caf50;" id="discountAmountModal">Rs. 0.00</span>
+                        </div>
                         <strong>Total: <span id="orderTotal">Rs. ${parseFloat(order.total || 0).toFixed(2)}</span></strong>
                     </div>
                     <div class="modal-actions">
@@ -712,20 +772,27 @@ function toggleMenuItem(menuItemId) {
 // Update order summary in modal
 function updateOrderSummaryModal() {
     const selectedItemsList = document.getElementById("selectedItemsListModal");
+    const subtotalEl = document.getElementById("subtotalAmountModal");
+    const discountInput = document.getElementById("discountInputModal");
+    const discountAmountEl = document.getElementById("discountAmountModal");
+    const discountRow = document.getElementById("discountRowModal");
     const orderTotal = document.getElementById("orderTotal");
 
     if (!selectedItemsList) return;
 
     if (Object.keys(selectedItems).length === 0) {
         selectedItemsList.innerHTML = '<p class="empty-message">No items selected</p>';
+        if (subtotalEl) subtotalEl.textContent = 'Rs. 0.00';
+        if (discountAmountEl) discountAmountEl.textContent = 'Rs. 0.00';
+        if (discountRow) discountRow.style.display = 'none';
         if (orderTotal) orderTotal.textContent = 'Rs. 0.00';
         return;
     }
 
-    let total = 0;
+    let subtotal = 0;
     selectedItemsList.innerHTML = Object.values(selectedItems).map(item => {
         const itemTotal = parseFloat(item.price) * item.qty;
-        total += itemTotal;
+        subtotal += itemTotal;
         const itemId = item.id || 0;
         return `
             <div class="selected-item-row">
@@ -743,6 +810,15 @@ function updateOrderSummaryModal() {
         `;
     }).join('');
 
+    // Get discount percentage
+    const discountPercent = discountInput ? parseFloat(discountInput.value) || 0 : 0;
+    const discountAmount = (subtotal * discountPercent) / 100;
+    const total = subtotal - discountAmount;
+
+    // Update display
+    if (subtotalEl) subtotalEl.textContent = `Rs. ${subtotal.toFixed(2)}`;
+    if (discountAmountEl) discountAmountEl.textContent = `-Rs. ${discountAmount.toFixed(2)}`;
+    if (discountRow) discountRow.style.display = discountPercent > 0 ? 'flex' : 'none';
     if (orderTotal) orderTotal.textContent = `Rs. ${total.toFixed(2)}`;
 }
 
@@ -819,14 +895,20 @@ async function updateOrder() {
         const customerName = editCustomerNameInput ? editCustomerNameInput.value.trim() : '';
         const customerPhone = editCustomerPhoneInput ? editCustomerPhoneInput.value.trim() : '';
 
-        // Calculate new total
-        const total = Object.values(selectedItems).reduce((sum, item) => {
+        // Calculate subtotal
+        const subtotal = Object.values(selectedItems).reduce((sum, item) => {
             return sum + (item.price * item.qty);
         }, 0);
 
+        // Get discount
+        const discountInput = document.getElementById("discountInputModal");
+        const discountPercent = discountInput ? parseFloat(discountInput.value) || 0 : 0;
+        const discountAmount = (subtotal * discountPercent) / 100;
+        const total = subtotal - discountAmount;
+
         // Update order
-        const updateOrderSql = `UPDATE orders SET total = ?, customer_name = ?, customer_phone = ? WHERE id = ?`;
-        await safeDbUpdate(updateOrderSql, [total, customerName, customerPhone, currentOrderId]);
+        const updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ?, customer_phone = ? WHERE id = ?`;
+        await safeDbUpdate(updateOrderSql, [total, discountPercent, customerName, customerPhone, currentOrderId]);
 
         // Delete existing order items
         const deleteItemsSql = `DELETE FROM order_items WHERE order_id = ?`;
@@ -942,11 +1024,48 @@ async function markOrderComplete() {
     }
 }
 
+// Cancel order function
+async function cancelOrder(orderId) {
+    if (!orderId || !(window.dbBackend || dbBackend)) {
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Invalid order or database not initialized");
+        } else {
+            alert("Invalid order or database not initialized");
+        }
+        return;
+    }
+
+    const confirmed = await showConfirmModal("Are you sure you want to cancel this order? This action cannot be undone.");
+    if (!confirmed) return;
+
+    try {
+        const updateStatusSql = `UPDATE orders SET order_status = 'cancelled', payment_status = 'cancelled' WHERE id = ?`;
+        await safeDbUpdate(updateStatusSql, [orderId]);
+
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Order cancelled successfully!");
+        } else {
+            alert("Order cancelled successfully!");
+        }
+
+        // Reload orders
+        loadDeliveryOrders();
+    } catch (error) {
+        console.error("Error cancelling order:", error);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error cancelling order: " + error.message);
+        } else {
+            alert("Error cancelling order: " + error.message);
+        }
+    }
+}
+
 // Make functions global
 window.openEditOrderModal = openEditOrderModal;
 window.closeOrderModal = closeOrderModal;
 window.updateOrder = updateOrder;
 window.markOrderComplete = markOrderComplete;
+window.cancelOrder = cancelOrder;
 window.filterMenuItems = filterMenuItems;
 window.toggleMenuItem = toggleMenuItem;
 window.increaseQuantityModal = increaseQuantityModal;

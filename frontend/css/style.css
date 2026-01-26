@@ -1129,6 +1129,15 @@ body {
     margin: 8px 0;
 }
 
+.status-cancelled {
+    background-color: #f44336;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
 .status-pending {
     color: #ff9800;
     font-weight: bold;
