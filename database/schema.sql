@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS orders (
     customer_phone TEXT,
     table_number INTEGER,
     total REAL NOT NULL,
+    discount_percentage REAL DEFAULT 0,
     order_status TEXT DEFAULT 'pending',
     payment_status TEXT DEFAULT 'pending',
     created_at TEXT NOT NULL
