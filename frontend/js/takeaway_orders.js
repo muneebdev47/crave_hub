@@ -761,9 +761,11 @@ async function openEditOrderModal(orderId) {
         <div class="order-modal-body">
             <div class="order-details-section">
                 <div class="order-info">
-                    <p><strong>Order ID:</strong> #${order.id}</p>
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 10px;">
+                        <p style="margin: 0;"><strong>Order ID:</strong> #${order.id}</p>
+                        <p style="margin: 0;"><strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}</p>
+                    </div>
                     <p><strong>Customer Name:</strong> <input type="text" id="editCustomerName" value="${order.customer_name || ''}" style="padding: 5px; width: 200px; border-radius: 4px; border: 1px solid #2A2A2A; background-color: white; color: black;"></p>
-                    <p><strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}</p>
                     <p><strong>Order Status:</strong> <span class="${order.order_status === 'completed' ? 'status-completed' : 'status-pending'}">${order.order_status === 'completed' ? 'Completed' : 'Pending'}</span></p>
                     <p><strong>Payment Status:</strong> <span class="${order.payment_status === 'paid' ? 'status-completed' : 'status-pending'}">${order.payment_status === 'paid' ? 'Paid' : 'Pending'}</span></p>
                 </div>

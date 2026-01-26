@@ -204,3 +204,11 @@ def _initialize_db(conn):
         except sqlite3.OperationalError:
             # Column already exists, ignore
             pass
+        
+        # Add customer_address column if it doesn't exist (migration)
+        try:
+            cursor.execute("ALTER TABLE orders ADD COLUMN customer_address TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            # Column already exists, ignore
+            pass

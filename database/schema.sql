@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS orders (
     order_type TEXT NOT NULL,
     customer_name TEXT,
     customer_phone TEXT,
+    customer_address TEXT,
     table_number INTEGER,
     total REAL NOT NULL,
     discount_percentage REAL DEFAULT 0,

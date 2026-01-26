@@ -660,13 +660,15 @@ async function openEditOrderModal(orderId) {
         <div class="order-modal-body">
             <div class="order-details-section">
                 <div class="order-info">
-                    <p><strong>Order ID:</strong> #${order.id}</p>
-                    <p><strong>Type:</strong> ${order.order_type}</p>
-                    <p><strong>Customer/Table:</strong> ${customerTableDisplay}</p>
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 10px;">
+                        <p style="margin: 0;"><strong style="margin-right: 5px;">Order ID:</strong>#${order.id}</p>
+                        <p style="margin: 0;"><strong style="margin-right: 5px;">Type:</strong>${order.order_type}</p>
+                        <p style="margin: 0;"><strong style="margin-right: 5px;">Date:</strong>${new Date(order.created_at).toLocaleString()}</p>
+                    </div>
                     ${order.customer_name ? `<p><strong>Customer Name:</strong> <input type="text" id="editCustomerName" value="${order.customer_name || ''}" style="padding: 5px; width: 200px; border-radius: 4px; border: 1px solid #2A2A2A; background-color: white; color: black;"></p>` : ''}
-                    ${order.customer_phone ? `<p><strong>Phone:</strong> <input type="text" id="editCustomerPhone" value="${order.customer_phone || ''}" style="padding: 5px; width: 200px; border-radius: 4px; border: 1px solid #2A2A2A; background-color: white; color: black;"></p>` : ''}
+                    ${order.customer_phone ? `<p><strong>Mobile Number: </strong> <input type="text" id="editCustomerPhone" value="${order.customer_phone || ''}" style="padding: 5px; width: 200px; border-radius: 4px; border: 1px solid #2A2A2A; background-color: white; color: black;"></p>` : ''}
+                    ${order.order_type === 'Delivery' ? `<p><strong>Delivery Address:</strong> <textarea id="editCustomerAddress" style="padding: 5px; width: 200px; min-height: 50px; border-radius: 4px; border: 1px solid #2A2A2A; background-color: white; color: black; resize: vertical; font-family: inherit;">${order.customer_address || ''}</textarea></p>` : ''}
                     ${order.table_number ? `<p><strong>Table Number:</strong> ${order.table_number}</p>` : ''}
-                    <p><strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}</p>
                     <p><strong>Order Status:</strong> <span class="${order.order_status === 'completed' ? 'status-completed' : 'status-pending'}" id="orderStatusDisplay">${order.order_status === 'completed' ? 'Completed' : 'Pending'}</span></p>
                     <p><strong>Payment Status:</strong> <span class="${order.payment_status === 'paid' ? 'status-completed' : 'status-pending'}">${order.payment_status === 'paid' ? 'Paid' : 'Pending'}</span></p>
                 </div>
@@ -890,8 +892,10 @@ async function updateOrder() {
         // Get updated customer info
         const editCustomerNameInput = document.getElementById("editCustomerName");
         const editCustomerPhoneInput = document.getElementById("editCustomerPhone");
+        const editCustomerAddressInput = document.getElementById("editCustomerAddress");
         const customerName = editCustomerNameInput ? editCustomerNameInput.value.trim() : null;
         const customerPhone = editCustomerPhoneInput ? editCustomerPhoneInput.value.trim() : null;
+        const customerAddress = editCustomerAddressInput ? editCustomerAddressInput.value.trim() : null;
 
         // Calculate subtotal
         const subtotal = Object.values(selectedItems).reduce((sum, item) => {
@@ -923,10 +927,16 @@ async function updateOrder() {
             updateParams = [total, discountPercent, currentOrderId];
         } else {
             // Takeaway/Delivery orders have customer_name
-            if (customerPhone !== null) {
+            if (order.order_type === 'Delivery') {
+                // Delivery orders have customer_name, phone, and address
+                updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ?, customer_phone = ?, customer_address = ? WHERE id = ?`;
+                updateParams = [total, discountPercent, customerName, customerPhone, customerAddress, currentOrderId];
+            } else if (customerPhone !== null) {
+                // Takeaway orders have customer_name and phone
                 updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ?, customer_phone = ? WHERE id = ?`;
                 updateParams = [total, discountPercent, customerName, customerPhone, currentOrderId];
             } else {
+                // Takeaway orders with only customer_name
                 updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ? WHERE id = ?`;
                 updateParams = [total, discountPercent, customerName, currentOrderId];
             }

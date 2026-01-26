@@ -1062,6 +1062,8 @@ body {
 .menu-section {
     grid-column: 1;
     overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .menu-section h3 {
@@ -1069,6 +1071,20 @@ body {
     margin-bottom: 15px;
     color: #fff;
     font-size: 18px;
+}
+
+.menu-section .menu-items-grid {
+    height: 500px !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    padding: 10px;
+    box-sizing: border-box;
+    flex: none;
+    min-height: 500px;
+    max-height: 500px;
 }
 
 /* Menu Search Input */
@@ -1102,6 +1118,9 @@ body {
     height: fit-content;
     position: sticky;
     top: 0;
+    min-height: 600px;
+    display: flex;
+    flex-direction: column;
 }
 
 .order-summary-section h3 {
@@ -1117,16 +1136,54 @@ body {
     padding: 20px 30px;
     border-radius: 8px;
     margin-bottom: 25px;
+    max-width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 .order-info {
+    max-width: 100%;
+    overflow: hidden;
     display: flex;
-    gap: 30px;
+    flex-wrap: wrap;
+    gap: 10px 10px;
     color: #fff;
 }
 
 .order-info p {
     margin: 8px 0;
+    min-width: 0;
+    flex: 1 1 auto;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.order-info p strong {
+    display: inline-block;
+    min-width: auto;
+    margin-right: 8px;
+}
+
+.order-info p input,
+.order-info p textarea {
+    vertical-align: top;
+}
+
+@media (max-width: 768px) {
+    .order-info {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .order-info p {
+        width: 100%;
+    }
+    
+    .order-info p strong {
+        min-width: auto;
+        display: block;
+        margin-bottom: 5px;
+    }
 }
 
 .status-cancelled {
@@ -1163,12 +1220,13 @@ body {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 15px;
-    max-height: 70vh;
-    min-width: 50vh;
+    flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 10px;
     box-sizing: border-box;
+    min-height: 0;
+    height: 500px;
 }
 
 .menu-item-card {
@@ -1220,9 +1278,10 @@ body {
 
 /* Selected Items List */
 .selected-items-list {
-    max-height: 50vh;
+    flex: 1;
     overflow-y: auto;
     margin-bottom: 15px;
+    min-height: 0;
 }
 
 .selected-item-row {
@@ -1415,6 +1474,10 @@ body {
     font-size: 18px;
 }
 
+.takeaway-menu-section .menu-items-grid {
+    height: 500px;
+}
+
 .takeaway-order-summary {
     grid-column: 2;
     background-color: #2A2A2A;
@@ -1459,7 +1522,7 @@ body {
 }
 
 .takeaway-order-summary .menu-items-grid {
-    max-height: 70vh;
+    flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
 }

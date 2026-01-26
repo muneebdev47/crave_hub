@@ -4,7 +4,7 @@ let selectedItems = {};
 let currentOrderId = null;
 let filteredMenuItems = [];
 
-let menuItemsContainer, totalAmountEl, menuSearchInput, customerNameInput, customerPhoneInput;
+let menuItemsContainer, totalAmountEl, menuSearchInput, customerNameInput, customerPhoneInput, customerAddressInput;
 
 // Helper function to safely execute database queries
 async function safeDbQuery(sql, params = null) {
@@ -306,10 +306,11 @@ async function saveOrder(orderType, total, discountPercent = 0) {
 
     try {
         const customerName = customerNameInput ? customerNameInput.value.trim() : '';
-        const now = new Date().toISOString();
-        const insertOrderSql = `INSERT INTO orders (order_type, total, discount_percentage, created_at, customer_name, customer_phone, order_status, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
         const customerPhone = customerPhoneInput ? customerPhoneInput.value.trim() : '';
-        const result = await safeDbUpdate(insertOrderSql, [orderType, total, discountPercent, now, customerName, customerPhone, 'pending', 'pending']);
+        const customerAddress = customerAddressInput ? customerAddressInput.value.trim() : '';
+        const now = new Date().toISOString();
+        const insertOrderSql = `INSERT INTO orders (order_type, total, discount_percentage, created_at, customer_name, customer_phone, customer_address, order_status, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const result = await safeDbUpdate(insertOrderSql, [orderType, total, discountPercent, now, customerName, customerPhone, customerAddress, 'pending', 'pending']);
 
         console.log("Order insert result:", result);
 
@@ -436,7 +437,7 @@ async function loadDeliveryOrders() {
 
     try {
         const sql = `
-            SELECT id, customer_name, customer_phone, total, created_at, order_status, payment_status
+            SELECT id, customer_name, customer_phone, customer_address, total, created_at, order_status, payment_status
             FROM orders
             WHERE order_type = 'Delivery'
             ORDER BY created_at DESC
@@ -505,6 +506,7 @@ document.addEventListener("DOMContentLoaded", () => {
     menuSearchInput = document.getElementById("menuSearch");
     customerNameInput = document.getElementById("customerName");
     customerPhoneInput = document.getElementById("customerPhone");
+    customerAddressInput = document.getElementById("customerAddress");
 
     // Make functions global for inline buttons
     window.removeItem = removeItem;
@@ -584,7 +586,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const discountAmount = (subtotal * discountPercent) / 100;
         const total = subtotal - discountAmount;
 
-        let orderSummary = `Customer: ${customerName}\nPhone: ${customerPhone}\n\n`;
+        const customerAddress = customerAddressInput ? customerAddressInput.value.trim() : '';
+        let orderSummary = `Customer: ${customerName}\nPhone: ${customerPhone}`;
+        if (customerAddress) {
+            orderSummary += `\nAddress: ${customerAddress}`;
+        }
+        orderSummary += `\n\n`;
         Object.values(selectedItems).forEach(item => {
             const itemTotal = parseFloat(item.price) * item.qty;
             orderSummary += `${item.name} x${item.qty} = Rs. ${itemTotal.toFixed(2)}\n`;
@@ -657,10 +664,13 @@ async function openEditOrderModal(orderId) {
         <div class="order-modal-body">
             <div class="order-details-section">
                 <div class="order-info">
-                    <p><strong>Order ID:</strong> #${order.id}</p>
-                    <p><strong>Customer Name:</strong> <input type="text" id="editCustomerName" value="${order.customer_name || ''}" style="padding: 5px; width: 200px; border-radius: 4px; border: 1px solid #2A2A2A; background-color: white; color: black;"></p>
-                    <p><strong>Phone Number:</strong> <input type="text" id="editCustomerPhone" value="${order.customer_phone || ''}" style="padding: 5px; width: 200px; border-radius: 4px; border: 1px solid #2A2A2A; background-color: white; color: black;"></p>
-                    <p><strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}</p>
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 10px;">
+                        <p style="margin: 0;"><strong>Order ID:</strong> #${order.id}</p>
+                        <p style="margin: 0;"><strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}</p>
+                    </div>
+                    <p><strong>Customer Name:</strong> <input type="text" id="editCustomerName" value="${order.customer_name || ''}" style="padding: 5px; width: 100%; max-width: 200px; border-radius: 4px; border: 1px solid #2A2A2A; background-color: white; color: black; box-sizing: border-box;"></p>
+                    <p><strong>Mobile Number: </strong> <input type="text" id="editCustomerPhone" value="${order.customer_phone || ''}" style="padding: 5px; width: 100%; max-width: 200px; border-radius: 4px; border: 1px solid #2A2A2A; background-color: white; color: black; box-sizing: border-box;"></p>
+                    <p style="flex-basis: 100%;"><strong>Delivery Address:</strong> <textarea id="editCustomerAddress" style="padding: 5px; width: 100%; max-width: 200px; min-height: 50px; border-radius: 4px; border: 1px solid #2A2A2A; background-color: white; color: black; resize: vertical; font-family: inherit; box-sizing: border-box;">${order.customer_address || ''}</textarea></p>
                     <p><strong>Order Status:</strong> <span class="${order.order_status === 'completed' ? 'status-completed' : 'status-pending'}">${order.order_status === 'completed' ? 'Completed' : 'Pending'}</span></p>
                     <p><strong>Payment Status:</strong> <span class="${order.payment_status === 'paid' ? 'status-completed' : 'status-pending'}">${order.payment_status === 'paid' ? 'Paid' : 'Pending'}</span></p>
                 </div>
@@ -892,8 +902,10 @@ async function updateOrder() {
         // Get updated customer info
         const editCustomerNameInput = document.getElementById("editCustomerName");
         const editCustomerPhoneInput = document.getElementById("editCustomerPhone");
+        const editCustomerAddressInput = document.getElementById("editCustomerAddress");
         const customerName = editCustomerNameInput ? editCustomerNameInput.value.trim() : '';
         const customerPhone = editCustomerPhoneInput ? editCustomerPhoneInput.value.trim() : '';
+        const customerAddress = editCustomerAddressInput ? editCustomerAddressInput.value.trim() : '';
 
         // Calculate subtotal
         const subtotal = Object.values(selectedItems).reduce((sum, item) => {
@@ -907,8 +919,8 @@ async function updateOrder() {
         const total = subtotal - discountAmount;
 
         // Update order
-        const updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ?, customer_phone = ? WHERE id = ?`;
-        await safeDbUpdate(updateOrderSql, [total, discountPercent, customerName, customerPhone, currentOrderId]);
+        const updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ?, customer_phone = ?, customer_address = ? WHERE id = ?`;
+        await safeDbUpdate(updateOrderSql, [total, discountPercent, customerName, customerPhone, customerAddress, currentOrderId]);
 
         // Delete existing order items
         const deleteItemsSql = `DELETE FROM order_items WHERE order_id = ?`;

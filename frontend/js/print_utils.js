@@ -168,9 +168,13 @@ function generateReceiptText(order, items) {
         lines.push("Table:           " + order.table_number);
     }
     
-    // Address (use customer address if available, otherwise default)
-    const address = order.customer_address || "Interloop Apparel #2 Hostels";
-    lines.push("Address:         " + address);
+    // Address - for delivery orders use customer_address, otherwise default
+    if (order.order_type === 'Delivery' && order.customer_address) {
+        lines.push("Address:         " + order.customer_address);
+    } else if (order.order_type !== 'Delivery') {
+        // For non-delivery orders, show default address
+        lines.push("Address:         Interloop Apparel #2 Hostels");
+    }
     lines.push("Order Due Date:  " + orderDate);
     lines.push("");
     
