@@ -147,16 +147,16 @@ function generateReceiptText(order, items) {
     const orderNo = `CHC-${String(order.id).padStart(3, '0')}`;
     
     // Header with logo area - make logo bold
-    lines.push(bold("       CRAVEHUB CAFE "));
+    lines.push(bold("          CRAVEHUB CAFE "));
     lines.push("");
-    lines.push("Interloop Apparel # 2 Hostels");
-    lines.push("+92 304 04 65 000");
+    lines.push("        Interloop Apparel # 2 Hostels");
+    lines.push("             +92 304 04 65 000");
     
     // Order Information Section - bold headings only
     lines.push(bold("Order No:") + "        " + orderNo);
     lines.push(bold("Order Date:") + "      " + orderDate);
-    lines.push(bold("Print Date & Time:") + " " + printDateTime);
-    lines.push(bold("Sales Associate:") + "  CRAVEHUB");
+    lines.push(bold("Print Time:") + "      " + printDateTime);
+    lines.push("");
     
     // Customer information - bold headings only
     if (order.customer_name) {
@@ -183,6 +183,7 @@ function generateReceiptText(order, items) {
     lines.push("");
     
     // Items Table Header - bold header row
+    // Fixed column widths: Sr(3) + 7sp, Product(19), Qty(3) + 3sp, Price(5) + 2sp, Total
     lines.push(bold("Sr.       Product            Qty   Price   Total"));
     lines.push("------------------------------------------------");
     
@@ -191,19 +192,30 @@ function generateReceiptText(order, items) {
     let totalQty = 0;
     const discountPercent = order.discount_percentage || 0;
     
-    // Items
+    // Items - fixed width columns to maintain alignment
     items.forEach((item, index) => {
-        const srNo = String(index + 1).padStart(2);
-        const product = item.name.length > 18 ? item.name.substring(0, 15) + '...' : item.name.padEnd(15);
-        const qty = String(item.quantity).padStart(3);
-        const price = String(item.price).padStart(5);
+        // Column 1: Serial number (2 chars) + 8 spaces = 10 chars total
+        const srNo = String(index + 1).padStart(2).padEnd(10);
+        
+        // Column 2: Product name (max 19 chars, truncate if longer)
+        const productName = item.name.length > 19 ? item.name.substring(0, 16) + '...' : item.name;
+        const product = productName.padEnd(19);
+        
+        // Column 3: Quantity (3 chars) + 3 spaces = 6 chars total
+        const qty = String(item.quantity).padStart(3).padEnd(6);
+        
+        // Column 4: Price (5 chars) + 2 spaces = 7 chars total
+        const price = String(parseFloat(item.price).toFixed(0)).padStart(5).padEnd(7);
+        
+        // Column 5: Total amount (right-aligned, variable width)
         const itemTotal = (item.price * item.quantity);
         const amount = String(itemTotal.toFixed(0)).padStart(6);
         
         subtotal += itemTotal;
         totalQty += item.quantity;
         
-        lines.push(`${srNo}    ${product}   ${qty}  ${price}  ${amount}`);
+        // Fixed-width columns ensure alignment regardless of product name length
+        lines.push(`${srNo}${product}${qty}${price}${amount}`);
     });
     
     lines.push("------------------------------------------------");
@@ -235,8 +247,8 @@ function generateReceiptText(order, items) {
     lines.push(bold("JazzCash:") + "         0301 04 65 000");
     lines.push("");
     lines.push("");
-    lines.push("Developer:  Muneeb 0325 6000 110");
-    lines.push("");
+    lines.push("------------------------------------------------");
+    lines.push("Developed by:  Muneeb 0325 6000 110");
     lines.push("");
     lines.push("");
 
