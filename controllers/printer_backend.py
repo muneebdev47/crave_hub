@@ -83,20 +83,52 @@ class PrinterBackend(QObject):
             
             # ALWAYS center the image on the receipt (384px width)
             final_width, final_height = img.size
+            
+            # Debug: Print dimensions before centering
+            print(f"Logo dimensions before centering: {final_width}x{final_height}")
+            print(f"Target receipt width: {receipt_width}")
+            
             # Create a new image with full receipt width and center the logo
-            new_img = Image.new('L', (receipt_width, final_height), 255)  # White background
+            # Use 'L' mode (grayscale) for the canvas
+            new_img = Image.new('L', (receipt_width, final_height), 255)  # White background (255 = white)
             x_offset = (receipt_width - final_width) // 2  # Center horizontally
+            print(f"Centering logo at x_offset: {x_offset}")
             new_img.paste(img, (x_offset, 0))
             img = new_img
             
+            # Verify the final dimensions
             width, height = img.size
+            print(f"Image width after centering: {width} (should be {receipt_width})")
+            
+            # Ensure width is exactly receipt_width (384px)
+            if width != receipt_width:
+                print(f"Warning: Width mismatch! Recreating centered image...")
+                # If somehow width is wrong, recreate with correct width
+                temp_img = Image.new('L', (receipt_width, height), 255)
+                paste_x = (receipt_width - width) // 2
+                temp_img.paste(img, (paste_x, 0))
+                img = temp_img
+                width, height = img.size
+                print(f"Final image width: {width}")
             
             # Apply threshold to convert to pure black and white
             # Threshold at 128 - pixels darker than 128 become black, lighter become white
             threshold = 128
             img = img.point(lambda p: 0 if p < threshold else 255, mode='1')
             
+            # Verify width after conversion (should still be receipt_width)
+            width, height = img.size
+            if width != receipt_width:
+                print(f"Warning: Image width is {width}, expected {receipt_width}. Recentering...")
+                # Recreate centered image if width changed
+                temp_img = Image.new('1', (receipt_width, height), 1)  # White background (1 = white in mode '1')
+                x_offset = (receipt_width - width) // 2
+                temp_img.paste(img, (x_offset, 0))
+                img = temp_img
+                width, height = img.size
+            
             # Calculate bytes per line (8 pixels per byte, rounded up)
+            # For 384px width: (384 + 7) // 8 = 48 bytes per line
             bytes_per_line = (width + 7) // 8
             
             # Use GS v 0 (raster format) - more reliable than ESC *
