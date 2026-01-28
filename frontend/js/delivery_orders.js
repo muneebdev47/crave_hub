@@ -308,9 +308,11 @@ async function saveOrder(orderType, total, discountPercent = 0) {
         const customerName = customerNameInput ? customerNameInput.value.trim() : '';
         const customerPhone = customerPhoneInput ? customerPhoneInput.value.trim() : '';
         const customerAddress = customerAddressInput ? customerAddressInput.value.trim() : '';
+        const orderNoteInput = document.getElementById("orderNoteInput");
+        const orderNote = orderNoteInput ? orderNoteInput.value.trim() : '';
         const now = new Date().toISOString();
-        const insertOrderSql = `INSERT INTO orders (order_type, total, discount_percentage, created_at, customer_name, customer_phone, customer_address, order_status, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-        const result = await safeDbUpdate(insertOrderSql, [orderType, total, discountPercent, now, customerName, customerPhone, customerAddress, 'pending', 'pending']);
+        const insertOrderSql = `INSERT INTO orders (order_type, total, discount_percentage, created_at, customer_name, customer_phone, customer_address, order_status, payment_status, order_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const result = await safeDbUpdate(insertOrderSql, [orderType, total, discountPercent, now, customerName, customerPhone, customerAddress, 'pending', 'pending', orderNote]);
 
         console.log("Order insert result:", result);
 
@@ -692,6 +694,10 @@ async function openEditOrderModal(orderId) {
                         <label for="discountInputModal" style="color: white; display: block; margin-bottom: 5px; font-size: 14px;">Discount (%):</label>
                         <input type="number" id="discountInputModal" min="0" max="100" step="0.01" value="${order.discount_percentage || 0}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px;" oninput="updateOrderSummaryModal()">
                     </div>
+                    <div class="note-section" style="margin: 15px 0;">
+                        <label for="orderNoteInputModal" style="color: white; display: block; margin-bottom: 5px; font-size: 14px;">Order Note:</label>
+                        <textarea id="orderNoteInputModal" placeholder="Enter order note (optional)" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px; resize: vertical; min-height: 60px; font-family: inherit;">${order.order_note || ''}</textarea>
+                    </div>
                     <div class="order-total">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                             <span style="color: #aaa;">Subtotal:</span>
@@ -919,8 +925,12 @@ async function updateOrder() {
         const total = subtotal - discountAmount;
 
         // Update order
-        const updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ?, customer_phone = ?, customer_address = ? WHERE id = ?`;
-        await safeDbUpdate(updateOrderSql, [total, discountPercent, customerName, customerPhone, customerAddress, currentOrderId]);
+        // Get order note
+        const orderNoteInputModal = document.getElementById("orderNoteInputModal");
+        const orderNote = orderNoteInputModal ? orderNoteInputModal.value.trim() : '';
+        
+        const updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ?, customer_phone = ?, customer_address = ?, order_note = ? WHERE id = ?`;
+        await safeDbUpdate(updateOrderSql, [total, discountPercent, customerName, customerPhone, customerAddress, orderNote, currentOrderId]);
 
         // Delete existing order items
         const deleteItemsSql = `DELETE FROM order_items WHERE order_id = ?`;

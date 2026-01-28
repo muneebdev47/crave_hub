@@ -150,9 +150,9 @@ function generateReceiptText(order, items) {
     const orderNo = `CHC-${String(order.id).padStart(3, '0')}`;
     
     // Header - centered (no space on top)
-    lines.push(CENTER + BOLD_ON + "CRAVEHUB CAFE" + BOLD_OFF + LEFT);
-    lines.push(CENTER + "Interloop Apparel # 2 Hostels" + LEFT);
-    lines.push(CENTER + "+92 304 04 65 000" + LEFT);
+    lines.push(CENTER + BOLD_ON + "      CRAVEHUB CAFE" + BOLD_OFF + LEFT);
+    lines.push(CENTER + "          Interloop Apparel # 2 Hostels" + LEFT);
+    lines.push(CENTER + "            +92 304 04 65 000" + LEFT);
     lines.push("");
     
     // Order Information Section - right aligned, bold headings only
@@ -239,8 +239,19 @@ function generateReceiptText(order, items) {
     lines.push("");
     
     // Notes Section - bold heading only
-    lines.push(bold("Note:"));
-    lines.push("Thank you for choosing us.");
+    lines.push(bold("Order Note:"));
+    if (order.order_note && order.order_note.trim()) {
+        // Split note into lines if it's long
+        const noteLines = order.order_note.split('\n');
+        noteLines.forEach(line => {
+            lines.push(line.trim());
+        });
+    } else {
+        lines.push("");
+    }
+    lines.push(bold("Workshop Note:"));
+    lines.push("");
+    lines.push("Thank you for choosing us. Please come again.");
     lines.push("");
     
     // Payment Details - bold headings only

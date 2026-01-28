@@ -690,6 +690,10 @@ async function openEditOrderModal(orderId) {
                         <label for="discountInputModal" style="color: white; display: block; margin-bottom: 5px; font-size: 14px;">Discount (%):</label>
                         <input type="number" id="discountInputModal" min="0" max="100" step="0.01" value="${order.discount_percentage || 0}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px;" oninput="updateOrderSummaryModal()">
                     </div>
+                    <div class="note-section" style="margin: 15px 0;">
+                        <label for="orderNoteInputModal" style="color: white; display: block; margin-bottom: 5px; font-size: 14px;">Order Note:</label>
+                        <textarea id="orderNoteInputModal" placeholder="Enter order note (optional)" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px; resize: vertical; min-height: 60px; font-family: inherit;">${order.order_note || ''}</textarea>
+                    </div>
                     <div class="order-total">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                             <span style="color: #aaa;">Subtotal:</span>
@@ -908,6 +912,10 @@ async function updateOrder() {
         const discountAmount = (subtotal * discountPercent) / 100;
         const total = subtotal - discountAmount;
 
+        // Get order note
+        const orderNoteInputModal = document.getElementById("orderNoteInputModal");
+        const orderNote = orderNoteInputModal ? orderNoteInputModal.value.trim() : '';
+
         // Build update query based on order type
         let updateOrderSql;
         let updateParams;
@@ -923,22 +931,22 @@ async function updateOrder() {
 
         if (order.order_type === 'Table') {
             // Table orders don't have customer_name/phone
-            updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ? WHERE id = ?`;
-            updateParams = [total, discountPercent, currentOrderId];
+            updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, order_note = ? WHERE id = ?`;
+            updateParams = [total, discountPercent, orderNote, currentOrderId];
         } else {
             // Takeaway/Delivery orders have customer_name
             if (order.order_type === 'Delivery') {
                 // Delivery orders have customer_name, phone, and address
-                updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ?, customer_phone = ?, customer_address = ? WHERE id = ?`;
-                updateParams = [total, discountPercent, customerName, customerPhone, customerAddress, currentOrderId];
+                updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ?, customer_phone = ?, customer_address = ?, order_note = ? WHERE id = ?`;
+                updateParams = [total, discountPercent, customerName, customerPhone, customerAddress, orderNote, currentOrderId];
             } else if (customerPhone !== null) {
                 // Takeaway orders have customer_name and phone
-                updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ?, customer_phone = ? WHERE id = ?`;
-                updateParams = [total, discountPercent, customerName, customerPhone, currentOrderId];
+                updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ?, customer_phone = ?, order_note = ? WHERE id = ?`;
+                updateParams = [total, discountPercent, customerName, customerPhone, orderNote, currentOrderId];
             } else {
                 // Takeaway orders with only customer_name
-                updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ? WHERE id = ?`;
-                updateParams = [total, discountPercent, customerName, currentOrderId];
+                updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, customer_name = ?, order_note = ? WHERE id = ?`;
+                updateParams = [total, discountPercent, customerName, orderNote, currentOrderId];
             }
         }
 

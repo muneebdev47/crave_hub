@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS orders (
     discount_percentage REAL DEFAULT 0,
     order_status TEXT DEFAULT 'pending',
     payment_status TEXT DEFAULT 'pending',
+    order_note TEXT,
     created_at TEXT NOT NULL
 );
 

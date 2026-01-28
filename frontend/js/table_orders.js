@@ -208,6 +208,10 @@ function openNewOrderModal(tableNumber) {
                     <label for="discountInput" style="color: white; display: block; margin-bottom: 5px; font-size: 14px;">Discount (%):</label>
                     <input type="number" id="discountInput" min="0" max="100" step="0.01" value="0" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px;" oninput="updateOrderSummary()">
                 </div>
+                <div class="note-section" style="margin: 15px 0;">
+                    <label for="orderNoteInput" style="color: white; display: block; margin-bottom: 5px; font-size: 14px;">Order Note:</label>
+                    <textarea id="orderNoteInput" placeholder="Enter order note (optional)" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px; resize: vertical; min-height: 60px; font-family: inherit;"></textarea>
+                </div>
                 <div class="order-total">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                         <span style="color: #aaa;">Subtotal:</span>
@@ -291,6 +295,10 @@ async function openOrderModal(tableNumber, order) {
                 <div class="discount-section" style="margin: 15px 0;">
                     <label for="discountInput" style="color: white; display: block; margin-bottom: 5px; font-size: 14px;">Discount (%):</label>
                     <input type="number" id="discountInput" min="0" max="100" step="0.01" value="${order.discount_percentage || 0}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px;" oninput="updateOrderSummary()">
+                </div>
+                <div class="note-section" style="margin: 15px 0;">
+                    <label for="orderNoteInput" style="color: white; display: block; margin-bottom: 5px; font-size: 14px;">Order Note:</label>
+                    <textarea id="orderNoteInput" placeholder="Enter order note (optional)" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px; resize: vertical; min-height: 60px; font-family: inherit;">${order.order_note || ''}</textarea>
                 </div>
                 <div class="order-total">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
@@ -489,12 +497,20 @@ function removeItem(menuItemId) {
 // Save new order
 async function saveOrder() {
     if (Object.keys(selectedItems).length === 0) {
-        alert("Please select at least one item");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Please select at least one item");
+        } else {
+            alert("Please select at least one item");
+        }
         return;
     }
 
     if (!(window.dbBackend || dbBackend)) {
-        alert("Database not initialized");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Database not initialized");
+        } else {
+            alert("Database not initialized");
+        }
         return;
     }
 
@@ -503,7 +519,11 @@ async function saveOrder() {
     const existingOrder = await safeDbQuery(checkTableSql, [currentTableNumber]);
 
     if (existingOrder && existingOrder.length > 0) {
-        alert(`Table ${currentTableNumber} already has an active order. Please complete or update the existing order first.`);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal(`Table ${currentTableNumber} already has an active order. Please complete or update the existing order first.`);
+        } else {
+            alert(`Table ${currentTableNumber} already has an active order. Please complete or update the existing order first.`);
+        }
         return;
     }
 
@@ -519,17 +539,25 @@ async function saveOrder() {
         const discountAmount = (subtotal * discountPercent) / 100;
         const total = subtotal - discountAmount;
 
+        // Get order note
+        const orderNoteInput = document.getElementById("orderNoteInput");
+        const orderNote = orderNoteInput ? orderNoteInput.value.trim() : '';
+        
         // Insert order with table number
         const now = new Date().toISOString();
-        const insertOrderSql = `INSERT INTO orders (order_type, total, discount_percentage, created_at, table_number, order_status, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-        const result = await safeDbUpdate(insertOrderSql, ['Table', total, discountPercent, now, currentTableNumber, 'pending', 'pending']);
+        const insertOrderSql = `INSERT INTO orders (order_type, total, discount_percentage, created_at, table_number, order_status, payment_status, order_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+        const result = await safeDbUpdate(insertOrderSql, ['Table', total, discountPercent, now, currentTableNumber, 'pending', 'pending', orderNote]);
 
         console.log("Order insert result:", result);
         console.log("Result type:", typeof result);
         console.log("Result keys:", result ? Object.keys(result) : "null");
 
         if (!result || result.success === false) {
-            alert("Error saving order: " + (result?.error || "Unknown error"));
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Error saving order: " + (result?.error || "Unknown error"));
+            } else {
+                alert("Error saving order: " + (result?.error || "Unknown error"));
+            }
             return;
         }
 
@@ -564,14 +592,30 @@ async function saveOrder() {
                                 script.onload = async () => {
                                     if (typeof printOrderReceipt === 'function') {
                                         await printOrderReceipt(fallbackOrderId, dbBackend);
-                                    } else alert("Error: Print function not available");
+                                    } else {
+                                        if (typeof showAlertModal === 'function') {
+                                            await showAlertModal("Error: Print function not available");
+                                        } else {
+                                            alert("Error: Print function not available");
+                                        }
+                                    }
                                 };
-                                script.onerror = () => alert("Error loading print utilities");
+                                script.onerror = async () => {
+                                    if (typeof showAlertModal === 'function') {
+                                        await showAlertModal("Error loading print utilities");
+                                    } else {
+                                        alert("Error loading print utilities");
+                                    }
+                                };
                                 document.head.appendChild(script);
                             }
                         } catch (e) {
                             console.error("[TABLE] Error printing receipt:", e);
-                            alert("Error printing receipt: " + e.message);
+                            if (typeof showAlertModal === 'function') {
+                                await showAlertModal("Error printing receipt: " + e.message);
+                            } else {
+                                alert("Error printing receipt: " + e.message);
+                            }
                         }
                     }
                     closeOrderModal();
@@ -580,7 +624,11 @@ async function saveOrder() {
                     return;
                 }
             }
-            alert("Error getting order ID. Please check console for details.");
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Error getting order ID. Please check console for details.");
+            } else {
+                alert("Error getting order ID. Please check console for details.");
+            }
             return;
         }
 
@@ -601,14 +649,30 @@ async function saveOrder() {
                     script.onload = async () => {
                         if (typeof printOrderReceipt === 'function') {
                             await printOrderReceipt(finalOrderId, dbBackend);
-                        } else alert("Error: Print function not available");
+                        } else {
+                            if (typeof showAlertModal === 'function') {
+                                await showAlertModal("Error: Print function not available");
+                            } else {
+                                alert("Error: Print function not available");
+                            }
+                        }
                     };
-                    script.onerror = () => alert("Error loading print utilities");
+                    script.onerror = async () => {
+                        if (typeof showAlertModal === 'function') {
+                            await showAlertModal("Error loading print utilities");
+                        } else {
+                            alert("Error loading print utilities");
+                        }
+                    };
                     document.head.appendChild(script);
                 }
             } catch (error) {
                 console.error("[TABLE] Error printing receipt:", error);
-                alert("Error printing receipt: " + error.message);
+                if (typeof showAlertModal === 'function') {
+                    await showAlertModal("Error printing receipt: " + error.message);
+                } else {
+                    alert("Error printing receipt: " + error.message);
+                }
             }
         }
 
@@ -618,7 +682,11 @@ async function saveOrder() {
 
     } catch (error) {
         console.error("Error saving order:", error);
-        alert("Error saving order: " + error.message);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error saving order: " + error.message);
+        } else {
+            alert("Error saving order: " + error.message);
+        }
     }
 }
 
@@ -646,12 +714,20 @@ async function insertOrderItems(orderId) {
 // Update existing order
 async function updateOrder() {
     if (Object.keys(selectedItems).length === 0) {
-        alert("Please select at least one item");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Please select at least one item");
+        } else {
+            alert("Please select at least one item");
+        }
         return;
     }
 
     if (!currentOrderId || !(window.dbBackend || dbBackend)) {
-        alert("Invalid order or database not initialized");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Invalid order or database not initialized");
+        } else {
+            alert("Invalid order or database not initialized");
+        }
         return;
     }
 
@@ -667,9 +743,13 @@ async function updateOrder() {
         const discountAmount = (subtotal * discountPercent) / 100;
         const total = subtotal - discountAmount;
 
-        // Update order total
-        const updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ? WHERE id = ?`;
-        await safeDbUpdate(updateOrderSql, [total, discountPercent, currentOrderId]);
+        // Get order note
+        const orderNoteInput = document.getElementById("orderNoteInput");
+        const orderNote = orderNoteInput ? orderNoteInput.value.trim() : '';
+
+        // Update order total and note
+        const updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, order_note = ? WHERE id = ?`;
+        await safeDbUpdate(updateOrderSql, [total, discountPercent, orderNote, currentOrderId]);
 
         // Delete existing order items
         const deleteItemsSql = `DELETE FROM order_items WHERE order_id = ?`;
@@ -681,20 +761,32 @@ async function updateOrder() {
             await safeDbUpdate(insertItemSql, [currentOrderId, item.id, item.qty, item.price]);
         }
 
-        alert("Order updated successfully!");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Order updated successfully!");
+        } else {
+            alert("Order updated successfully!");
+        }
         closeOrderModal();
         loadTableOrders();
         loadTableOrdersTable();
     } catch (error) {
         console.error("Error updating order:", error);
-        alert("Error updating order: " + error.message);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error updating order: " + error.message);
+        } else {
+            alert("Error updating order: " + error.message);
+        }
     }
 }
 
 // Mark order as complete
 async function markOrderComplete() {
     if (!currentOrderId || !(window.dbBackend || dbBackend)) {
-        alert("Invalid order or database not initialized");
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Invalid order or database not initialized");
+        } else {
+            alert("Invalid order or database not initialized");
+        }
         return;
     }
 
@@ -705,7 +797,11 @@ async function markOrderComplete() {
         const orderSql = `SELECT total FROM orders WHERE id = ?`;
         const orders = await safeDbQuery(orderSql, [currentOrderId]);
         if (!orders || orders.length === 0) {
-            alert("Order not found");
+            if (typeof showAlertModal === 'function') {
+                await showAlertModal("Order not found");
+            } else {
+                alert("Order not found");
+            }
             return;
         }
         const orderTotal = orders[0].total;
@@ -729,14 +825,30 @@ async function markOrderComplete() {
                     script.onload = async () => {
                         if (typeof printOrderReceipt === 'function') {
                             await printOrderReceipt(currentOrderId, dbBackend);
-                        } else alert("Error: Print function not available");
+                        } else {
+                            if (typeof showAlertModal === 'function') {
+                                await showAlertModal("Error: Print function not available");
+                            } else {
+                                alert("Error: Print function not available");
+                            }
+                        }
                     };
-                    script.onerror = () => alert("Error loading print utilities");
+                    script.onerror = async () => {
+                        if (typeof showAlertModal === 'function') {
+                            await showAlertModal("Error loading print utilities");
+                        } else {
+                            alert("Error loading print utilities");
+                        }
+                    };
                     document.head.appendChild(script);
                 }
             } catch (error) {
                 console.error("[TABLE] Error printing receipt:", error);
-                alert("Error printing receipt: " + error.message);
+                if (typeof showAlertModal === 'function') {
+                    await showAlertModal("Error printing receipt: " + error.message);
+                } else {
+                    alert("Error printing receipt: " + error.message);
+                }
             }
         }
 
@@ -745,7 +857,11 @@ async function markOrderComplete() {
         loadTableOrdersTable();
     } catch (error) {
         console.error("Error completing order:", error);
-        alert("Error completing order: " + error.message);
+        if (typeof showAlertModal === 'function') {
+            await showAlertModal("Error completing order: " + error.message);
+        } else {
+            alert("Error completing order: " + error.message);
+        }
     }
 }
 
