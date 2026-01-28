@@ -37,11 +37,20 @@ class PrinterBackend(QObject):
     def _image_to_escpos(self, image_path, max_width=384):
         """
         Convert image to ESC/POS bitmap format (black and white)
+        Uses GS v 0 (raster format) which is more reliable than ESC *
         max_width: Maximum width in pixels (384 for 80mm thermal printer)
         """
         try:
             # Open and process image
             img = Image.open(image_path)
+            
+            # Convert RGBA to RGB if needed (remove transparency)
+            if img.mode == 'RGBA':
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                background.paste(img, mask=img.split()[3])  # Use alpha channel as mask
+                img = background
+            elif img.mode not in ('RGB', 'L'):
+                img = img.convert('RGB')
             
             # Convert to grayscale
             if img.mode != 'L':
@@ -52,7 +61,7 @@ class PrinterBackend(QObject):
             if width > max_width:
                 ratio = max_width / width
                 new_height = int(height * ratio)
-                # Use LANCZOS for better quality (Pillow 9+ uses Image.Resampling.LANCZOS, older versions use Image.LANCZOS)
+                # Use LANCZOS for better quality
                 try:
                     img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
                 except AttributeError:
@@ -64,39 +73,53 @@ class PrinterBackend(QObject):
                 new_img.paste(img, (x_offset, 0))
                 img = new_img
             
-            # Threshold to black and white (128 is the threshold)
-            img = img.point(lambda x: 0 if x < 128 else 255, mode='1')
-            
             width, height = img.size
             
-            # Convert to ESC/POS bitmap format
-            # ESC * m nL nH d1...dk (bitmap command)
-            # m = 0 (8-dot single-density), 1 (8-dot double-density), 32 (24-dot single-density), 33 (24-dot double-density)
-            # We'll use mode 0 for 8-dot single-density
+            # Apply threshold to convert to pure black and white
+            # Threshold at 128 - pixels darker than 128 become black, lighter become white
+            threshold = 128
+            img = img.point(lambda p: 0 if p < threshold else 255, mode='1')
             
-            # Calculate bytes per line (8 pixels per byte)
+            # Calculate bytes per line (8 pixels per byte, rounded up)
             bytes_per_line = (width + 7) // 8
-            nL = bytes_per_line & 0xFF
-            nH = (bytes_per_line >> 8) & 0xFF
+            
+            # Use GS v 0 (raster format) - more reliable than ESC *
+            # GS v 0 m xL xH yL yH d1...dk
+            # m = 0 (normal), x = width in bytes, y = height in dots
+            
+            xL = bytes_per_line & 0xFF
+            xH = (bytes_per_line >> 8) & 0xFF
+            yL = height & 0xFF
+            yH = (height >> 8) & 0xFF
             
             escpos_data = bytearray()
             
-            # Process image row by row
+            # GS v 0 command
+            escpos_data.extend(b'\x1D\x76\x30')  # GS v 0
+            escpos_data.append(0)  # m = 0 (normal)
+            escpos_data.append(xL)
+            escpos_data.append(xH)
+            escpos_data.append(yL)
+            escpos_data.append(yH)
+            
+            # Get pixel accessor
             pixels = img.load()
+            
+            # Convert image to bytes (row by row)
             for y in range(height):
-                # ESC * command
-                escpos_data.extend(b'\x1B\x2A\x00')  # ESC * 0 (8-dot single-density)
-                escpos_data.append(nL)
-                escpos_data.append(nH)
-                
-                # Convert row to bytes
                 for x in range(0, width, 8):
                     byte = 0
                     for bit in range(8):
-                        if x + bit < width:
-                            # Invert: 0 (black) becomes 1, 255 (white) becomes 0
-                            pixel = pixels[x + bit, y]
-                            if pixel == 0:  # Black pixel
+                        pixel_x = x + bit
+                        if pixel_x < width:
+                            # Read pixel value
+                            pixel_value = pixels[pixel_x, y]
+                            
+                            # In mode '1', 0 = black, 255 = white
+                            # For ESC/POS, black pixels (0) should set the bit to 1
+                            # White pixels (255) should leave the bit as 0
+                            if pixel_value == 0:  # Black pixel
+                                # Set bit (MSB first, left to right)
                                 byte |= (1 << (7 - bit))
                     escpos_data.append(byte)
             
@@ -104,6 +127,8 @@ class PrinterBackend(QObject):
             
         except Exception as e:
             print(f"Error converting image to ESC/POS: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     @pyqtSlot(str, result=str)
