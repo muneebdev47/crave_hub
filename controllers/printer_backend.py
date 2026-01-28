@@ -59,18 +59,21 @@ class PrinterBackend(QObject):
             if img.mode != 'L':
                 img = img.convert('L')
             
-            # Resize to fit printer width while maintaining aspect ratio
+            # Resize logo to 95% of max width (5% smaller) while maintaining aspect ratio
+            receipt_width = 384
+            target_width = int(receipt_width * 0.95)  # 95% of receipt width = 364px
+            
             width, height = img.size
-            if width > max_width:
-                ratio = max_width / width
+            if width > target_width:
+                ratio = target_width / width
                 new_height = int(height * ratio)
                 # Use LANCZOS for better quality
                 try:
-                    img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+                    img = img.resize((target_width, new_height), Image.Resampling.LANCZOS)
                 except AttributeError:
-                    img = img.resize((max_width, new_height), Image.LANCZOS)
+                    img = img.resize((target_width, new_height), Image.LANCZOS)
             else:
-                # Resize to 95% of original size, then center
+                # If image is smaller, resize to 95% of its original size
                 new_width = int(width * 0.95)
                 new_height = int(height * 0.95)
                 try:
@@ -78,15 +81,13 @@ class PrinterBackend(QObject):
                 except AttributeError:
                     img = img.resize((new_width, new_height), Image.LANCZOS)
             
-            # Always center the image on the receipt (384px width)
-            receipt_width = 384
+            # ALWAYS center the image on the receipt (384px width)
             final_width, final_height = img.size
-            if final_width < receipt_width:
-                # Center the image horizontally
-                new_img = Image.new('L', (receipt_width, final_height), 255)  # White background
-                x_offset = (receipt_width - final_width) // 2
-                new_img.paste(img, (x_offset, 0))
-                img = new_img
+            # Create a new image with full receipt width and center the logo
+            new_img = Image.new('L', (receipt_width, final_height), 255)  # White background
+            x_offset = (receipt_width - final_width) // 2  # Center horizontally
+            new_img.paste(img, (x_offset, 0))
+            img = new_img
             
             width, height = img.size
             
