@@ -41,6 +41,9 @@ class PrinterBackend(QObject):
         max_width: Maximum width in pixels (384 for 80mm thermal printer)
         """
         try:
+            # Reduce max_width by 5% to make logo smaller
+            max_width = int(max_width * 0.95)
+            
             # Open and process image
             img = Image.open(image_path)
             
@@ -67,9 +70,21 @@ class PrinterBackend(QObject):
                 except AttributeError:
                     img = img.resize((max_width, new_height), Image.LANCZOS)
             else:
-                # Center the image if it's smaller than max_width
-                new_img = Image.new('L', (max_width, height), 255)  # White background
-                x_offset = (max_width - width) // 2
+                # Resize to 95% of original size, then center
+                new_width = int(width * 0.95)
+                new_height = int(height * 0.95)
+                try:
+                    img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                except AttributeError:
+                    img = img.resize((new_width, new_height), Image.LANCZOS)
+            
+            # Always center the image on the receipt (384px width)
+            receipt_width = 384
+            final_width, final_height = img.size
+            if final_width < receipt_width:
+                # Center the image horizontally
+                new_img = Image.new('L', (receipt_width, final_height), 255)  # White background
+                x_offset = (receipt_width - final_width) // 2
                 new_img.paste(img, (x_offset, 0))
                 img = new_img
             
