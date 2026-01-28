@@ -10,198 +10,123 @@ class PrinterBackend(QObject):
         super().__init__()
 
         if sys.platform != "win32":
-            raise RuntimeError("Windows only")
+            raise RuntimeError("Thermal printing supported on Windows only")
 
         self.printer_name = win32print.GetDefaultPrinter()
+        self.RECEIPT_WIDTH = 384  # 80mm thermal printer (203 DPI)
 
+    # --------------------------------------------------
+    # Resolve logo path (works in dev + PyInstaller)
+    # --------------------------------------------------
     def _get_logo_path(self):
-        """Get the path to the logo file"""
         try:
-            # Try to get path relative to executable (PyInstaller)
-            base_path = Path(sys._MEIPASS)
+            base_path = Path(sys._MEIPASS)  # PyInstaller
         except AttributeError:
-            # Development mode - use project root
-            base_path = Path(__file__).resolve().parent.parent
-        
-        # Try logo.png first, then logo.ico
-        logo_png = base_path / "assets" / "logo.png"
-        logo_ico = base_path / "assets" / "logo.ico"
-        
-        if logo_png.exists():
-            return logo_png
-        elif logo_ico.exists():
-            return logo_ico
-        else:
-            return None
+            base_path = Path(__file__).resolve().parent.parent  # Dev
 
-    def _image_to_escpos(self, image_path, max_width=384):
-        """
-        Convert image to ESC/POS bitmap format (black and white)
-        Uses GS v 0 (raster format) which is more reliable than ESC *
-        max_width: Maximum width in pixels (384 for 80mm thermal printer)
-        """
+        for name in ("logo.png", "logo.ico", "logo.jpg", "logo.jpeg"):
+            p = base_path / "assets" / name
+            if p.exists():
+                return p
+        return None
+
+    # --------------------------------------------------
+    # Convert image → ESC/POS raster (GS v 0)
+    # --------------------------------------------------
+    def _image_to_escpos(self, image_path):
         try:
-            # Reduce max_width by 5% to make logo smaller
-            max_width = int(max_width * 0.95)
-            
-            # Open and process image
+            # ---------- Load image ----------
             img = Image.open(image_path)
-            
-            # Convert RGBA to RGB if needed (remove transparency)
-            if img.mode == 'RGBA':
-                background = Image.new('RGB', img.size, (255, 255, 255))
-                background.paste(img, mask=img.split()[3])  # Use alpha channel as mask
-                img = background
-            elif img.mode not in ('RGB', 'L'):
-                img = img.convert('RGB')
-            
+
+            # Remove transparency
+            if img.mode == "RGBA":
+                bg = Image.new("RGB", img.size, (255, 255, 255))
+                bg.paste(img, mask=img.split()[3])
+                img = bg
+
             # Convert to grayscale
-            if img.mode != 'L':
-                img = img.convert('L')
-            
-            # Resize logo to 95% of max width (5% smaller) while maintaining aspect ratio
-            receipt_width = 384
-            target_width = int(receipt_width * 0.95)  # 95% of receipt width = 364px
-            
+            img = img.convert("L")
+
+            # ---------- Resize (85–95% width looks best) ----------
+            target_width = int(self.RECEIPT_WIDTH * 0.90)
+            w, h = img.size
+            ratio = target_width / w
+            new_h = int(h * ratio)
+
+            try:
+                img = img.resize((target_width, new_h), Image.Resampling.LANCZOS)
+            except AttributeError:
+                img = img.resize((target_width, new_h), Image.LANCZOS)
+
+            # ---------- Center logo on 384px canvas ----------
+            left_pad = (self.RECEIPT_WIDTH - target_width) // 2
+            canvas = Image.new("L", (self.RECEIPT_WIDTH, new_h), 255)
+            canvas.paste(img, (left_pad, 0))
+            img = canvas
+
+            # ---------- Convert to pure B/W ----------
+            img = img.point(lambda p: 0 if p < 128 else 255, mode="1")
+
             width, height = img.size
-            if width > target_width:
-                ratio = target_width / width
-                new_height = int(height * ratio)
-                # Use LANCZOS for better quality
-                try:
-                    img = img.resize((target_width, new_height), Image.Resampling.LANCZOS)
-                except AttributeError:
-                    img = img.resize((target_width, new_height), Image.LANCZOS)
-            else:
-                # If image is smaller, resize to 95% of its original size
-                new_width = int(width * 0.95)
-                new_height = int(height * 0.95)
-                try:
-                    img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                except AttributeError:
-                    img = img.resize((new_width, new_height), Image.LANCZOS)
-            
-            # ALWAYS center the image on the receipt (384px width)
-            final_width, final_height = img.size
-            
-            # Calculate left padding to center the logo
-            # This adds white space on the left to push the logo to the right
-            left_padding = (receipt_width - final_width) // 2
-            
-            # Create a full-width image with white background
-            # The white space on the left will push the logo to the center
-            new_img = Image.new('L', (receipt_width, final_height), 255)  # White background (255 = white)
-            # Paste the logo starting at left_padding (white space on left, logo on right)
-            new_img.paste(img, (left_padding, 0))
-            img = new_img
-            
-            # Verify the final dimensions are correct
-            width, height = img.size
-            if width != receipt_width:
-                # Ensure width is exactly receipt_width (384px)
-                temp_img = Image.new('L', (receipt_width, height), 255)
-                temp_img.paste(img, (0, 0))
-                img = temp_img
-                width, height = img.size
-            
-            # Apply threshold to convert to pure black and white
-            # Threshold at 128 - pixels darker than 128 become black, lighter become white
-            threshold = 128
-            img = img.point(lambda p: 0 if p < threshold else 255, mode='1')
-            
-            # Verify width after conversion (should still be receipt_width)
-            width, height = img.size
-            if width != receipt_width:
-                # Recreate centered image if width changed during conversion
-                # Recalculate padding to ensure logo stays centered
-                logo_actual_width = min(width, receipt_width - 20)  # Estimate logo width
-                left_padding = (receipt_width - logo_actual_width) // 2
-                temp_img = Image.new('1', (receipt_width, height), 1)  # White background (1 = white in mode '1')
-                # Paste the logo with left padding to center it
-                temp_img.paste(img, (left_padding, 0))
-                img = temp_img
-                width, height = img.size
-            
-            # Calculate bytes per line (8 pixels per byte, rounded up)
-            # For 384px width: (384 + 7) // 8 = 48 bytes per line
-            bytes_per_line = (width + 7) // 8
-            
-            # Use GS v 0 (raster format) - more reliable than ESC *
-            # GS v 0 m xL xH yL yH d1...dk
-            # m = 0 (normal), x = width in bytes, y = height in dots
-            
-            xL = bytes_per_line & 0xFF
-            xH = (bytes_per_line >> 8) & 0xFF
+            bytes_per_row = (width + 7) // 8
+
+            # ---------- ESC/POS: GS v 0 ----------
+            xL = bytes_per_row & 0xFF
+            xH = (bytes_per_row >> 8) & 0xFF
             yL = height & 0xFF
             yH = (height >> 8) & 0xFF
-            
-            escpos_data = bytearray()
-            
-            # GS v 0 command
-            escpos_data.extend(b'\x1D\x76\x30')  # GS v 0
-            escpos_data.append(0)  # m = 0 (normal)
-            escpos_data.append(xL)
-            escpos_data.append(xH)
-            escpos_data.append(yL)
-            escpos_data.append(yH)
-            
-            # Get pixel accessor
+
+            escpos = bytearray()
+            escpos.extend(b"\x1D\x76\x30\x00")  # GS v 0 m=0
+            escpos.extend(bytes([xL, xH, yL, yH]))
+
             pixels = img.load()
-            
-            # Convert image to bytes (row by row)
             for y in range(height):
                 for x in range(0, width, 8):
                     byte = 0
-                    for bit in range(8):
-                        pixel_x = x + bit
-                        if pixel_x < width:
-                            # Read pixel value
-                            pixel_value = pixels[pixel_x, y]
-                            
-                            # In mode '1', 0 = black, 255 = white
-                            # For ESC/POS, black pixels (0) should set the bit to 1
-                            # White pixels (255) should leave the bit as 0
-                            if pixel_value == 0:  # Black pixel
-                                # Set bit (MSB first, left to right)
-                                byte |= (1 << (7 - bit))
-                    escpos_data.append(byte)
-            
-            return bytes(escpos_data)
-            
+                    for b in range(8):
+                        if x + b < width and pixels[x + b, y] == 0:
+                            byte |= (1 << (7 - b))
+                    escpos.append(byte)
+
+            return bytes(escpos)
+
         except Exception as e:
-            print(f"Error converting image to ESC/POS: {e}")
-            import traceback
-            traceback.print_exc()
+            print("ESC/POS image error:", e)
             return None
 
+    # --------------------------------------------------
+    # Print receipt
+    # --------------------------------------------------
     @pyqtSlot(str, result=str)
     def print_receipt(self, text):
-        """
-        Print receipt with logo at the top
-        text: Receipt text in ESC/POS format
-        """
         try:
             hPrinter = win32print.OpenPrinter(self.printer_name)
 
-            win32print.StartDocPrinter(hPrinter, 1, ("Receipt", None, "RAW"))
+            win32print.StartDocPrinter(hPrinter, 1, ("CraveHub Receipt", None, "RAW"))
             win32print.StartPagePrinter(hPrinter)
 
-            # Print logo at the top
+            # ---------- RESET printer state ----------
+            win32print.WritePrinter(hPrinter, b"\x1B\x40")  # ESC @
+            win32print.WritePrinter(hPrinter, b"\x1D\x4C\x00\x00")  # Left margin = 0
+            win32print.WritePrinter(hPrinter, b"\x1D\x57\x80\x01")  # Width = 384
+            win32print.WritePrinter(hPrinter, b"\x1B\x61\x00")  # Align LEFT (important)
+
+            # ---------- Print logo ----------
             logo_path = self._get_logo_path()
             if logo_path:
                 logo_data = self._image_to_escpos(logo_path)
                 if logo_data:
                     win32print.WritePrinter(hPrinter, logo_data)
-                    # Add some spacing after logo
                     win32print.WritePrinter(hPrinter, b"\n\n")
 
-            # TEXT (CP437 — NOT UTF-8)
+            # ---------- Print text ----------
             win32print.WritePrinter(
                 hPrinter,
                 text.encode("cp437", errors="replace")
             )
 
-            # FEED + CUT
+            # ---------- Feed + Cut ----------
             win32print.WritePrinter(hPrinter, b"\n\n\x1D\x56\x41\x10")
 
             win32print.EndPagePrinter(hPrinter)
