@@ -150,9 +150,9 @@ function generateReceiptText(order, items) {
     const orderNo = `CHC-${String(order.id).padStart(3, '0')}`;
     
     // Header - centered (no space on top)
-    lines.push(CENTER + BOLD_ON + "      CRAVEHUB CAFE" + BOLD_OFF + LEFT);
+    lines.push(CENTER + BOLD_ON + "                  CRAVEHUB CAFE" + BOLD_OFF + LEFT);
     lines.push(CENTER + "          Interloop Apparel # 2 Hostels" + LEFT);
-    lines.push(CENTER + "            +92 304 04 65 000" + LEFT);
+    lines.push(CENTER + "                 +92 304 04 65 000" + LEFT);
     lines.push("");
     
     // Order Information Section - right aligned, bold headings only
@@ -249,8 +249,8 @@ function generateReceiptText(order, items) {
     } else {
         lines.push("");
     }
-    lines.push(bold("Workshop Note:"));
     lines.push("");
+    lines.push(bold("Note:"));
     lines.push("Thank you for choosing us. Please come again.");
     lines.push("");
     
@@ -258,7 +258,7 @@ function generateReceiptText(order, items) {
     lines.push(bold("Bank:") + "             Meezan Bank");
     lines.push(bold("Name:") + "             Awais Amjad");
     lines.push(bold("Account Number:") + "   2647 0113908048");
-    lines.push(bold("IBAN:") + "              PK72 MEZN 0026 4701 1390 8048");
+    lines.push(bold("IBAN:") + "             PK72 MEZN 0026 4701 1390 8048");
     lines.push(bold("JazzCash:") + "         0301 04 65 000");
     lines.push("");
     lines.push("");
