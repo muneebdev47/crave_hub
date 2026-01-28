@@ -84,32 +84,25 @@ class PrinterBackend(QObject):
             # ALWAYS center the image on the receipt (384px width)
             final_width, final_height = img.size
             
-            # Debug: Print dimensions before centering
-            print(f"Logo dimensions before centering: {final_width}x{final_height}")
-            print(f"Target receipt width: {receipt_width}")
+            # Calculate left padding to center the logo
+            # This adds white space on the left to push the logo to the right
+            left_padding = (receipt_width - final_width) // 2
             
-            # Create a new image with full receipt width and center the logo
-            # Use 'L' mode (grayscale) for the canvas
+            # Create a full-width image with white background
+            # The white space on the left will push the logo to the center
             new_img = Image.new('L', (receipt_width, final_height), 255)  # White background (255 = white)
-            x_offset = (receipt_width - final_width) // 2  # Center horizontally
-            print(f"Centering logo at x_offset: {x_offset}")
-            new_img.paste(img, (x_offset, 0))
+            # Paste the logo starting at left_padding (white space on left, logo on right)
+            new_img.paste(img, (left_padding, 0))
             img = new_img
             
-            # Verify the final dimensions
+            # Verify the final dimensions are correct
             width, height = img.size
-            print(f"Image width after centering: {width} (should be {receipt_width})")
-            
-            # Ensure width is exactly receipt_width (384px)
             if width != receipt_width:
-                print(f"Warning: Width mismatch! Recreating centered image...")
-                # If somehow width is wrong, recreate with correct width
+                # Ensure width is exactly receipt_width (384px)
                 temp_img = Image.new('L', (receipt_width, height), 255)
-                paste_x = (receipt_width - width) // 2
-                temp_img.paste(img, (paste_x, 0))
+                temp_img.paste(img, (0, 0))
                 img = temp_img
                 width, height = img.size
-                print(f"Final image width: {width}")
             
             # Apply threshold to convert to pure black and white
             # Threshold at 128 - pixels darker than 128 become black, lighter become white
@@ -119,11 +112,13 @@ class PrinterBackend(QObject):
             # Verify width after conversion (should still be receipt_width)
             width, height = img.size
             if width != receipt_width:
-                print(f"Warning: Image width is {width}, expected {receipt_width}. Recentering...")
-                # Recreate centered image if width changed
+                # Recreate centered image if width changed during conversion
+                # Recalculate padding to ensure logo stays centered
+                logo_actual_width = min(width, receipt_width - 20)  # Estimate logo width
+                left_padding = (receipt_width - logo_actual_width) // 2
                 temp_img = Image.new('1', (receipt_width, height), 1)  # White background (1 = white in mode '1')
-                x_offset = (receipt_width - width) // 2
-                temp_img.paste(img, (x_offset, 0))
+                # Paste the logo with left padding to center it
+                temp_img.paste(img, (left_padding, 0))
                 img = temp_img
                 width, height = img.size
             
