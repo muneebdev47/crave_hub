@@ -107,10 +107,11 @@ class PrinterBackend(QObject):
             win32print.StartPagePrinter(hPrinter)
 
             # ---------- RESET printer state ----------
-            win32print.WritePrinter(hPrinter, b"\x1B\x40")  # ESC @
+            win32print.WritePrinter(hPrinter, b"\x1B\x40")  # ESC @ (reset)
+            win32print.WritePrinter(hPrinter, b"\x1B\x32")  # ESC 2 = default line spacing (prevents compressed text)
             win32print.WritePrinter(hPrinter, b"\x1D\x4C\x00\x00")  # Left margin = 0
             win32print.WritePrinter(hPrinter, b"\x1D\x57\x80\x01")  # Width = 384
-            win32print.WritePrinter(hPrinter, b"\x1B\x61\x00")  # Align LEFT (important)
+            win32print.WritePrinter(hPrinter, b"\x1B\x61\x00")  # Align LEFT
 
             # ---------- Print logo ----------
             logo_path = self._get_logo_path()
@@ -126,8 +127,10 @@ class PrinterBackend(QObject):
                 text.encode("cp437", errors="replace")
             )
 
-            # ---------- Feed + Cut ----------
-            win32print.WritePrinter(hPrinter, b"\n\n\x1D\x56\x41\x10")
+            # ---------- Feed paper so full receipt prints, then cut ----------
+            win32print.WritePrinter(hPrinter, b"\n\n\n\n\n")  # Extra feed so bottom isn't cut off
+            win32print.WritePrinter(hPrinter, b"\x1B\x32")     # Reset to default line spacing before cut
+            win32print.WritePrinter(hPrinter, b"\x1D\x56\x41\x10")  # Full cut
 
             win32print.EndPagePrinter(hPrinter)
             win32print.EndDocPrinter(hPrinter)

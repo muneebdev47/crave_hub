@@ -255,6 +255,7 @@ function generateReceiptText(order, items) {
     lines.push(bold("Note:"));
     lines.push("Thank you for choosing us. Please come again.");
     lines.push("");
+    lines.push("");
     
     // Payment Details - bold headings only
     lines.push(bold("Bank:") + "             Meezan Bank");
