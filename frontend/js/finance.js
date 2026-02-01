@@ -70,13 +70,20 @@ async function safeDbUpdate(sql, params) {
     }
 }
 
-// Open date picker when calendar icon is clicked
+// Open date picker when calendar icon is clicked (must run synchronously in click handler)
 function openDatePicker(inputId) {
     const input = document.getElementById(inputId);
     if (!input) return;
-    input.focus();
-    if (typeof input.showPicker === 'function') {
-        input.showPicker();
+    try {
+        // showPicker() requires a user gesture; call it directly without focus() first
+        if (typeof input.showPicker === 'function') {
+            input.showPicker();
+        } else {
+            input.focus();
+        }
+    } catch (e) {
+        // NotAllowedError: showPicker requires user gesture (e.g. in Qt WebEngine)
+        input.focus();
     }
 }
 
@@ -86,12 +93,28 @@ function setupDateCalendarIcons() {
     const toIcon = document.getElementById("dateToCalendarIcon");
     if (fromIcon) {
         fromIcon.addEventListener("click", function () {
-            openDatePicker("dateFrom");
+            const input = document.getElementById("dateFrom");
+            if (input) {
+                try {
+                    if (typeof input.showPicker === "function") input.showPicker();
+                    else input.focus();
+                } catch (_) {
+                    input.focus();
+                }
+            }
         });
     }
     if (toIcon) {
         toIcon.addEventListener("click", function () {
-            openDatePicker("dateTo");
+            const input = document.getElementById("dateTo");
+            if (input) {
+                try {
+                    if (typeof input.showPicker === "function") input.showPicker();
+                    else input.focus();
+                } catch (_) {
+                    input.focus();
+                }
+            }
         });
     }
 }
