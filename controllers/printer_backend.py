@@ -60,12 +60,7 @@ class PrinterBackend(QObject):
             except AttributeError:
                 img = img.resize((target_width, new_h), Image.LANCZOS)
 
-            # ---------- Vertical center: add equal padding above and below ----------
-            pad_vertical = max(24, new_h // 2)  # at least 24 dots, or half logo height
-            total_height = new_h + 2 * pad_vertical
-            canvas = Image.new("L", (target_width, total_height), 255)
-            canvas.paste(img, (0, pad_vertical))  # horizontally full width, vertically centered
-            img = canvas
+            # ---------- No extra space above/below logo; use logo at natural height ----------
 
             # ---------- Convert to pure B/W ----------
             img = img.point(lambda p: 0 if p < 128 else 255, mode="1")
