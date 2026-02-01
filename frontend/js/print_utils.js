@@ -194,30 +194,33 @@ function generateReceiptText(order, items) {
     let totalQty = 0;
     const discountPercent = order.discount_percentage || 0;
     
-    // Items - fixed width columns to maintain alignment
-    items.forEach((item, index) => {
-        // Column 1: Serial number (2 chars) + 8 spaces = 10 chars total
-        const srNo = String(index + 1).padStart(2).padEnd(10);
-        
-        // Column 2: Product name (max 19 chars, truncate if longer)
+    // Items - fixed width columns to maintain alignment; expand deal components on receipt
+    let sr = 0;
+    items.forEach((item) => {
+        sr += 1;
+        const srNo = String(sr).padStart(2).padEnd(10);
         const productName = item.name.length > 19 ? item.name.substring(0, 16) + '...' : item.name;
         const product = productName.padEnd(19);
-        
-        // Column 3: Quantity (3 chars) + 3 spaces = 6 chars total
         const qty = String(item.quantity).padStart(3).padEnd(6);
-        
-        // Column 4: Price (5 chars) + 2 spaces = 7 chars total
         const price = String(parseFloat(item.price).toFixed(0)).padStart(5).padEnd(7);
-        
-        // Column 5: Total amount (right-aligned, variable width)
         const itemTotal = (item.price * item.quantity);
         const amount = String(itemTotal.toFixed(0)).padStart(6);
-        
+
         subtotal += itemTotal;
         totalQty += item.quantity;
-        
-        // Fixed-width columns ensure alignment regardless of product name length
+
         lines.push(`${srNo}${product}${qty}${price}${amount}`);
+
+        // If this is a deal, show included items underneath (indented)
+        if (item.deal_components && item.deal_components.length > 0) {
+            item.deal_components.forEach(comp => {
+                const compQty = (comp.quantity || 1) * item.quantity;
+                const compName = ("   " + (comp.name || "Item")).substring(0, 19);
+                const compNamePadded = compName.padEnd(19);
+                const compQtyStr = String(compQty).padStart(3).padEnd(6);
+                lines.push(`          ${compNamePadded}${compQtyStr}`);
+            });
+        }
     });
     
     lines.push("------------------------------------------------");
@@ -279,12 +282,36 @@ async function printOrderReceipt(orderId, dbBackend) {
     }
 
     const itemsSql = `
-        SELECT oi.quantity, oi.price, mi.name
+        SELECT oi.quantity, oi.price, oi.menu_item_id, mi.name, COALESCE(mi.is_deal, 0) as is_deal
         FROM order_items oi
         JOIN menu_items mi ON oi.menu_item_id = mi.id
         WHERE oi.order_id = ?
     `;
-    const items = await safeDbQuery(itemsSql, [orderId]);
+    const rawItems = await safeDbQuery(itemsSql, [orderId]);
+
+    // Expand deals: for each deal item, fetch its components from deal_items
+    const items = [];
+    for (const row of rawItems) {
+        const item = {
+            name: row.name,
+            quantity: row.quantity,
+            price: row.price,
+            menu_item_id: row.menu_item_id,
+            is_deal: row.is_deal === 1 || row.is_deal === true
+        };
+        if (item.is_deal) {
+            const dealItemsSql = `
+                SELECT di.quantity, COALESCE(di.item_name, mi.name) as name
+                FROM deal_items di
+                LEFT JOIN menu_items mi ON mi.id = di.menu_item_id
+                WHERE di.deal_id = ?
+                ORDER BY di.id
+            `;
+            const components = await safeDbQuery(dealItemsSql, [row.menu_item_id]);
+            item.deal_components = (components || []).map(c => ({ name: c.name, quantity: c.quantity }));
+        }
+        items.push(item);
+    }
 
     const receiptText = generateReceiptText(orders[0], items);
 

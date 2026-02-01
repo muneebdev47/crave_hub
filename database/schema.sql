@@ -12,7 +12,18 @@ CREATE TABLE IF NOT EXISTS menu_items (
     name TEXT NOT NULL,
     category TEXT NOT NULL,
     price REAL NOT NULL,
-    is_available INTEGER DEFAULT 1
+    is_available INTEGER DEFAULT 1,
+    is_deal INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS deal_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id INTEGER NOT NULL,
+    menu_item_id INTEGER,
+    item_name TEXT,
+    quantity INTEGER DEFAULT 1,
+    FOREIGN KEY (deal_id) REFERENCES menu_items(id) ON DELETE CASCADE,
+    FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)
 );
 
 CREATE TABLE IF NOT EXISTS orders (

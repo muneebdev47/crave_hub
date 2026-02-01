@@ -118,14 +118,14 @@ MENU_ITEMS = [
 ("Chicken Spring Rolls", "Starters", 400),
 ("Special Platter", "Starters", 900),
 # Deals
-("Deal 1", "Deals", 399),
-("Deal 2", "Deals", 750),
-("Deal 3", "Deals", 2699),
-("Deal 4", "Deals", 2499),
-("Deal 5", "Deals", 1450),
-("Deal 6", "Deals", 799),
-("Deal 7", "Deals", 1150),
-("Deal 8", "Deals", 1350)
+# ("Deal 1", "Deals", 399),
+# ("Deal 2", "Deals", 750),
+# ("Deal 3", "Deals", 2699),
+# ("Deal 4", "Deals", 2499),
+# ("Deal 5", "Deals", 1450),
+# ("Deal 6", "Deals", 799),
+# ("Deal 7", "Deals", 1150),
+# ("Deal 8", "Deals", 1350)
 ]
 def get_connection():
     """
@@ -220,3 +220,67 @@ def _initialize_db(conn):
         except sqlite3.OperationalError:
             # Column already exists, ignore
             pass
+        
+        # Add is_deal column to menu_items if it doesn't exist (migration)
+        try:
+            cursor.execute("ALTER TABLE menu_items ADD COLUMN is_deal INTEGER DEFAULT 0")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        
+        # Create deal_items table if it doesn't exist (migration)
+        cursor.execute(
+            """
+            SELECT name FROM sqlite_master
+            WHERE type='table' AND name='deal_items';
+            """
+        )
+        if cursor.fetchone() is None:
+            cursor.execute("""
+                CREATE TABLE deal_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    deal_id INTEGER NOT NULL,
+                    menu_item_id INTEGER,
+                    item_name TEXT,
+                    quantity INTEGER DEFAULT 1,
+                    FOREIGN KEY (deal_id) REFERENCES menu_items(id) ON DELETE CASCADE,
+                    FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)
+                )
+            """)
+            conn.commit()
+        else:
+            # Add item_name column to existing deal_items if missing
+            try:
+                cursor.execute("ALTER TABLE deal_items ADD COLUMN item_name TEXT")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+            # Make menu_item_id nullable by recreating table (SQLite doesn't support ALTER COLUMN)
+            cursor.execute("PRAGMA table_info(deal_items)")
+            cols = [row[1] for row in cursor.fetchall()]
+            if 'item_name' in cols:
+                cursor.execute(
+                    """
+                    SELECT name FROM sqlite_master
+                    WHERE type='table' AND name='deal_items_new';
+                    """
+                )
+                if cursor.fetchone() is None:
+                    cursor.execute("""
+                        CREATE TABLE deal_items_new (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            deal_id INTEGER NOT NULL,
+                            menu_item_id INTEGER,
+                            item_name TEXT,
+                            quantity INTEGER DEFAULT 1,
+                            FOREIGN KEY (deal_id) REFERENCES menu_items(id) ON DELETE CASCADE,
+                            FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)
+                        )
+                    """)
+                    cursor.execute("""
+                        INSERT INTO deal_items_new (id, deal_id, menu_item_id, item_name, quantity)
+                        SELECT id, deal_id, menu_item_id, item_name, quantity FROM deal_items
+                    """)
+                    cursor.execute("DROP TABLE deal_items")
+                    cursor.execute("ALTER TABLE deal_items_new RENAME TO deal_items")
+                    conn.commit()

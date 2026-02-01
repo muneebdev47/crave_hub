@@ -966,6 +966,74 @@ body {
     background-color: #555;
 }
 
+.menu-form-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+.menu-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #fff;
+    cursor: pointer;
+}
+.menu-checkbox-label input { width: auto; min-width: auto; }
+
+.deal-items-section {
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px;
+    /* background: #1A1A1A; */
+    border-radius: 6px;
+    border: 1px solid #333;
+}
+.deal-items-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid #333;
+    color: #fff;
+}
+.deal-items-list-item:last-child { border-bottom: none; }
+.deal-add-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+.deal-add-row select {
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #444;
+    background: #2a2a2a;
+    color: #fff;
+    min-width: 180px;
+}
+.deal-add-row input { min-width: 60px; }
+.btn-deal-add {
+    padding: 8px 12px;
+    background: #4caf50;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+.btn-deal-add:hover { background: #45a049; }
+.btn-deal-remove {
+    padding: 4px 8px;
+    background: #f44336;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+.btn-deal-remove:hover { background: #d32f2f; }
+
 /* Order Modal Styles */
 .order-modal {
     display: none;

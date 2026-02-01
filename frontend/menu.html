@@ -20,8 +20,23 @@
             <div class="menu-form">
                 <input type="hidden" id="menu-id">
                 <input type="text" id="menu-name" placeholder="Item Name">
-                <input type="text" id="menu-category" placeholder="Category">
+                <input type="text" id="menu-category" placeholder="Category (e.g. Deals, Beverages)">
                 <input type="number" id="menu-price" placeholder="Price">
+                <div class="menu-form-row">
+                    <label class="menu-checkbox-label">
+                        <input type="checkbox" id="menu-is-deal">
+                        <span>Is Deal (contains multiple menu items)</span>
+                    </label>
+                </div>
+                <div id="deal-items-section" class="deal-items-section" style="display: none;">
+                    <h4 style="color: #fff; margin-bottom: 10px;">Items in this deal</h4>
+                    <div id="deal-items-list"></div>
+                    <div class="deal-add-row">
+                        <input type="text" id="deal-item-name" placeholder="Item name (e.g. 1 Small Pizza, 350 ml Drink)" style="flex: 1; min-width: 200px;">
+                        <input type="number" id="deal-item-qty" placeholder="Qty" min="1" value="1" style="width: 60px;">
+                        <button type="button" id="deal-add-item-btn" class="btn-deal-add">Add to deal</button>
+                    </div>
+                </div>
                 <button id="add-update-btn">Add Item</button>
                 <button id="clear-btn">Clear</button>
             </div>

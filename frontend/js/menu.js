@@ -3,6 +3,8 @@ let filteredMenuItems = [];
 let editingId = null;
 let dbBackend = null;
 let menuBackend = null;
+/** When editing/adding a deal: array of { menu_item_id, name, quantity } */
+let dealItemsForForm = [];
 
 // Helper function to safely execute database queries
 async function safeDbQuery(sql, params = null) {
@@ -121,7 +123,7 @@ async function loadMenuItems() {
 
     try {
         // Direct SQL query to menu_items table - order by category and name
-        const sql = "SELECT id, name, category, price, is_available FROM menu_items ORDER BY category, name";
+        const sql = "SELECT id, name, category, price, is_available, COALESCE(is_deal, 0) as is_deal FROM menu_items ORDER BY category, name";
         const result = await safeDbQuery(sql);
         menuItems = result;
         filteredMenuItems = result;
@@ -154,10 +156,12 @@ function renderMenuCards() {
         card.className = `menu-card ${!isAvailable ? 'disabled' : ''}`;
         card.style.cursor = "pointer";
 
+        const isDeal = item.is_deal === 1 || item.is_deal === true;
         card.innerHTML = `
             <div class="menu-card-header">
                 <h3>${item.name || 'Unknown Item'}</h3>
                 <span class="menu-status-badge ${isAvailable ? 'available' : 'unavailable'}">${isAvailable ? 'Available' : 'Disabled'}</span>
+                ${isDeal ? '<span class="menu-status-badge" style="background:#ff9800;">Deal</span>' : ''}
             </div>
             <p class="menu-card-category"><strong>Category:</strong> ${item.category || 'Uncategorized'}</p>
             <p class="menu-card-price"><strong>Price:</strong> Rs. ${parseFloat(item.price || 0).toFixed(2)}</p>
@@ -180,10 +184,69 @@ function renderMenuCards() {
     });
 }
 
+// Toggle deal section visibility
+function toggleDealSection() {
+    const isDeal = document.getElementById("menu-is-deal").checked;
+    const section = document.getElementById("deal-items-section");
+    if (section) section.style.display = isDeal ? "block" : "none";
+    if (isDeal) renderDealItemsList();
+}
+
+// Render the list of items in the deal
+function renderDealItemsList() {
+    const list = document.getElementById("deal-items-list");
+    if (!list) return;
+    if (dealItemsForForm.length === 0) {
+        list.innerHTML = '<p style="color:#888;font-size:13px;">No items added. Select an item below and click "Add to deal".</p>';
+        return;
+    }
+    list.innerHTML = dealItemsForForm.map((row, idx) => `
+        <div class="deal-items-list-item" data-index="${idx}">
+            <span>${row.name} x ${row.quantity}</span>
+            <button type="button" class="btn-deal-remove" data-index="${idx}">Remove</button>
+        </div>
+    `).join('');
+    list.querySelectorAll(".btn-deal-remove").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const idx = parseInt(btn.getAttribute("data-index"), 10);
+            dealItemsForForm.splice(idx, 1);
+            renderDealItemsList();
+        });
+    });
+}
+
+// Add manually entered item to deal
+function addItemToDeal() {
+    const nameInput = document.getElementById("deal-item-name");
+    const qtyInput = document.getElementById("deal-item-qty");
+    if (!nameInput || !qtyInput) return;
+    const name = nameInput.value.trim();
+    const qty = parseInt(qtyInput.value, 10) || 1;
+    if (!name) {
+        alert("Enter item name (e.g. 1 Small Pizza, 350 ml Drink).");
+        return;
+    }
+    if (qty < 1) {
+        alert("Enter quantity (at least 1).");
+        return;
+    }
+    dealItemsForForm.push({ name, quantity: qty });
+    renderDealItemsList();
+    nameInput.value = "";
+    qtyInput.value = "1";
+    nameInput.focus();
+}
+
 // Add or update item
 document.addEventListener("DOMContentLoaded", () => {
     const addUpdateBtn = document.getElementById("add-update-btn");
     if (!addUpdateBtn) return;
+
+    const isDealCheck = document.getElementById("menu-is-deal");
+    if (isDealCheck) isDealCheck.addEventListener("change", toggleDealSection);
+
+    const dealAddBtn = document.getElementById("deal-add-item-btn");
+    if (dealAddBtn) dealAddBtn.addEventListener("click", addItemToDeal);
 
     addUpdateBtn.addEventListener("click", async () => {
         if (!dbBackend) {
@@ -194,41 +257,56 @@ document.addEventListener("DOMContentLoaded", () => {
         const name = document.getElementById("menu-name").value.trim();
         const category = document.getElementById("menu-category").value.trim();
         const price = parseFloat(document.getElementById("menu-price").value.trim());
+        const isDeal = document.getElementById("menu-is-deal").checked;
 
         if (!name || !category || isNaN(price) || price <= 0) {
             alert("Please fill all fields correctly! Price must be greater than 0.");
             return;
         }
+        if (isDeal && dealItemsForForm.length === 0) {
+            alert("Please add at least one menu item to this deal.");
+            return;
+        }
 
         try {
+            const isDealInt = isDeal ? 1 : 0;
             if (editingId) {
-                // Update using direct SQL
-                const sql = `UPDATE menu_items SET name = ?, category = ?, price = ? WHERE id = ?`;
-                const result = await safeDbUpdate(sql, [name, category, price, editingId]);
-
+                const sql = `UPDATE menu_items SET name = ?, category = ?, price = ?, is_deal = ? WHERE id = ?`;
+                const result = await safeDbUpdate(sql, [name, category, price, isDealInt, editingId]);
                 if (result.error || result.success === false) {
                     alert("Error updating item: " + (result.error || "Unknown error"));
                     return;
                 }
-
+                const dealId = editingId;
+                if (isDeal) {
+                    await safeDbUpdate("DELETE FROM deal_items WHERE deal_id = ?", [dealId]);
+                    for (const row of dealItemsForForm) {
+                        await safeDbUpdate("INSERT INTO deal_items (deal_id, menu_item_id, item_name, quantity) VALUES (?, ?, ?, ?)", [dealId, null, row.name, row.quantity]);
+                    }
+                } else {
+                    await safeDbUpdate("DELETE FROM deal_items WHERE deal_id = ?", [dealId]);
+                }
                 editingId = null;
                 document.getElementById("add-update-btn").innerText = "Add Item";
                 document.getElementById("add-update-btn").classList.remove("btn-update");
             } else {
-                // Insert using direct SQL
-                const sql = `INSERT INTO menu_items (name, category, price, is_available) VALUES (?, ?, ?, 1)`;
-                const result = await safeDbUpdate(sql, [name, category, price]);
-
+                const sql = `INSERT INTO menu_items (name, category, price, is_available, is_deal) VALUES (?, ?, ?, 1, ?)`;
+                const result = await safeDbUpdate(sql, [name, category, price, isDealInt]);
                 if (result.error || result.success === false) {
                     alert("Error adding item: " + (result.error || "Unknown error"));
                     return;
                 }
+                const newId = result.last_insert_id || result.lastInsertId;
+                if (isDeal && newId) {
+                    for (const row of dealItemsForForm) {
+                        await safeDbUpdate("INSERT INTO deal_items (deal_id, menu_item_id, item_name, quantity) VALUES (?, ?, ?, ?)", [newId, null, row.name, row.quantity]);
+                    }
+                }
             }
 
             clearForm();
-            await loadMenuItems(); // Reload from DB
+            await loadMenuItems();
 
-            // Clear search if active
             const searchInput = document.getElementById("menu-search");
             if (searchInput) {
                 searchInput.value = '';
@@ -242,7 +320,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // Edit - populate form when card is clicked
-function editItem(id) {
+async function editItem(id) {
     const item = menuItems.find(i => i.id === id);
     if (!item) {
         alert("Item not found");
@@ -254,15 +332,22 @@ function editItem(id) {
     document.getElementById("menu-name").value = item.name;
     document.getElementById("menu-category").value = item.category;
     document.getElementById("menu-price").value = item.price;
+    const isDeal = item.is_deal === 1 || item.is_deal === true;
+    document.getElementById("menu-is-deal").checked = isDeal;
+
+    dealItemsForForm = [];
+    if (isDeal && dbBackend) {
+        const rows = await safeDbQuery("SELECT di.quantity, COALESCE(di.item_name, mi.name) as name FROM deal_items di LEFT JOIN menu_items mi ON mi.id = di.menu_item_id WHERE di.deal_id = ? ORDER BY di.id", [id]);
+        dealItemsForForm = (rows || []).map(r => ({ name: r.name || '', quantity: r.quantity || 1 }));
+    }
+    toggleDealSection();
+    if (isDeal) renderDealItemsList();
 
     const addUpdateBtn = document.getElementById("add-update-btn");
     addUpdateBtn.innerText = "Update Item";
     addUpdateBtn.classList.add("btn-update");
 
-    // Scroll to form
     document.querySelector(".menu-form").scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    // Focus on name field
     document.getElementById("menu-name").focus();
 }
 
@@ -382,6 +467,13 @@ function clearForm() {
     document.getElementById("menu-name").value = "";
     document.getElementById("menu-category").value = "";
     document.getElementById("menu-price").value = "";
+    const isDealCheck = document.getElementById("menu-is-deal");
+    if (isDealCheck) isDealCheck.checked = false;
+    dealItemsForForm = [];
+    const section = document.getElementById("deal-items-section");
+    if (section) section.style.display = "none";
+    const list = document.getElementById("deal-items-list");
+    if (list) list.innerHTML = "";
     editingId = null;
     const addUpdateBtn = document.getElementById("add-update-btn");
     addUpdateBtn.innerText = "Add Item";
