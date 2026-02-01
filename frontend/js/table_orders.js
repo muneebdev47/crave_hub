@@ -223,6 +223,14 @@ function openNewOrderModal(tableNumber) {
                     </div>
                     <strong>Total: <span id="orderTotal">Rs. 0.00</span></strong>
                 </div>
+                <div class="payment-received-section" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #444;">
+                    <label for="amountReceivedInput" style="color: white; display: block; margin-bottom: 6px; font-size: 14px;">Amount received (Rs.):</label>
+                    <input type="number" id="amountReceivedInput" min="0" step="0.01" placeholder="0" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px;" oninput="updatePaymentBalance()">
+                    <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 15px;">
+                        <span style="color: #aaa;">Balance to return:</span>
+                        <strong id="balanceReturn" style="color: #4caf50;">Rs. 0.00</strong>
+                    </div>
+                </div>
                 <div class="modal-actions">
                     <button class="btn-secondary" onclick="closeOrderModal()">Cancel</button>
                     <button class="btn-primary" onclick="saveOrder()">Place Order</button>
@@ -310,6 +318,14 @@ async function openOrderModal(tableNumber, order) {
                         <span style="color: #4caf50;" id="discountAmount">Rs. 0.00</span>
                     </div>
                     <strong>Total: <span id="orderTotal">Rs. ${parseFloat(order.total).toFixed(2)}</span></strong>
+                </div>
+                <div class="payment-received-section" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #444;">
+                    <label for="amountReceivedInput" style="color: white; display: block; margin-bottom: 6px; font-size: 14px;">Amount received (Rs.):</label>
+                    <input type="number" id="amountReceivedInput" min="0" step="0.01" placeholder="0" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px;" oninput="updatePaymentBalance()">
+                    <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 15px;">
+                        <span style="color: #aaa;">Balance to return:</span>
+                        <strong id="balanceReturn" style="color: #4caf50;">Rs. 0.00</strong>
+                    </div>
                 </div>
                 <div class="modal-actions">
                     <button class="btn-secondary" onclick="closeOrderModal()">Close</button>
@@ -423,6 +439,7 @@ function updateOrderSummary() {
         if (discountAmountEl) discountAmountEl.textContent = 'Rs. 0.00';
         if (discountRow) discountRow.style.display = 'none';
         if (orderTotal) orderTotal.textContent = 'Rs. 0.00';
+        updatePaymentBalance();
         return;
     }
 
@@ -456,7 +473,28 @@ function updateOrderSummary() {
     if (discountAmountEl) discountAmountEl.textContent = `-Rs. ${discountAmount.toFixed(2)}`;
     if (discountRow) discountRow.style.display = discountPercent > 0 ? 'flex' : 'none';
     if (orderTotal) orderTotal.textContent = `Rs. ${total.toFixed(2)}`;
+    updatePaymentBalance();
 }
+
+// Update balance to return when amount received or order total changes
+function updatePaymentBalance() {
+    const orderTotalEl = document.getElementById("orderTotal");
+    const amountReceivedInput = document.getElementById("amountReceivedInput");
+    const balanceReturnEl = document.getElementById("balanceReturn");
+    if (!orderTotalEl || !amountReceivedInput || !balanceReturnEl) return;
+    const totalText = orderTotalEl.textContent || "Rs. 0.00";
+    const total = parseFloat(totalText.replace(/[^0-9.-]/g, "")) || 0;
+    const received = parseFloat(amountReceivedInput.value) || 0;
+    const balance = received - total;
+    if (balance >= 0) {
+        balanceReturnEl.textContent = `Rs. ${balance.toFixed(2)}`;
+        balanceReturnEl.style.color = "#4caf50";
+    } else {
+        balanceReturnEl.textContent = `Short by Rs. ${Math.abs(balance).toFixed(2)}`;
+        balanceReturnEl.style.color = "#f44336";
+    }
+}
+window.updatePaymentBalance = updatePaymentBalance;
 
 // Quantity controls
 function increaseQuantity(menuItemId) {
@@ -542,11 +580,16 @@ async function saveOrder() {
         // Get order note
         const orderNoteInput = document.getElementById("orderNoteInput");
         const orderNote = orderNoteInput ? orderNoteInput.value.trim() : '';
-        
+        // Amount received and balance to return (for receipt)
+        const amountReceivedInput = document.getElementById("amountReceivedInput");
+        const amountReceived = amountReceivedInput ? parseFloat(amountReceivedInput.value) : null;
+        const amountReceivedVal = (amountReceived != null && !isNaN(amountReceived) && amountReceived > 0) ? amountReceived : null;
+        const balanceReturnVal = amountReceivedVal != null ? (amountReceivedVal - total) : null;
+
         // Insert order with table number
         const now = new Date().toISOString();
-        const insertOrderSql = `INSERT INTO orders (order_type, total, discount_percentage, created_at, table_number, order_status, payment_status, order_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-        const result = await safeDbUpdate(insertOrderSql, ['Table', total, discountPercent, now, currentTableNumber, 'pending', 'pending', orderNote]);
+        const insertOrderSql = `INSERT INTO orders (order_type, total, discount_percentage, created_at, table_number, order_status, payment_status, order_note, amount_received, balance_return) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const result = await safeDbUpdate(insertOrderSql, ['Table', total, discountPercent, now, currentTableNumber, 'pending', 'pending', orderNote, amountReceivedVal, balanceReturnVal]);
 
         console.log("Order insert result:", result);
         console.log("Result type:", typeof result);

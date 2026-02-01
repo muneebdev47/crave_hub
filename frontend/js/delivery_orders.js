@@ -257,7 +257,27 @@ function updateTotalWithDiscount() {
     if (discountAmountEl) discountAmountEl.textContent = `-Rs. ${discountAmount.toFixed(2)}`;
     if (discountRow) discountRow.style.display = discountPercent > 0 ? 'flex' : 'none';
     if (totalAmountEl) totalAmountEl.textContent = total.toFixed(2);
+    updateDeliveryPaymentBalance();
 }
+
+// Update balance to return when amount received or order total changes (delivery)
+function updateDeliveryPaymentBalance() {
+    const totalAmountEl = document.getElementById("totalAmount");
+    const amountReceivedInput = document.getElementById("amountReceivedInput");
+    const balanceReturnEl = document.getElementById("balanceReturn");
+    if (!totalAmountEl || !amountReceivedInput || !balanceReturnEl) return;
+    const total = parseFloat(totalAmountEl.textContent) || 0;
+    const received = parseFloat(amountReceivedInput.value) || 0;
+    const balance = received - total;
+    if (balance >= 0) {
+        balanceReturnEl.textContent = `Rs. ${balance.toFixed(2)}`;
+        balanceReturnEl.style.color = "#4caf50";
+    } else {
+        balanceReturnEl.textContent = `Short by Rs. ${Math.abs(balance).toFixed(2)}`;
+        balanceReturnEl.style.color = "#f44336";
+    }
+}
+window.updateDeliveryPaymentBalance = updateDeliveryPaymentBalance;
 
 // Make function globally accessible
 window.updateTotalWithDiscount = updateTotalWithDiscount;
@@ -310,9 +330,13 @@ async function saveOrder(orderType, total, discountPercent = 0) {
         const customerAddress = customerAddressInput ? customerAddressInput.value.trim() : '';
         const orderNoteInput = document.getElementById("orderNoteInput");
         const orderNote = orderNoteInput ? orderNoteInput.value.trim() : '';
+        const amountReceivedInput = document.getElementById("amountReceivedInput");
+        const amountReceived = amountReceivedInput ? parseFloat(amountReceivedInput.value) : null;
+        const amountReceivedVal = (amountReceived != null && !isNaN(amountReceived) && amountReceived > 0) ? amountReceived : null;
+        const balanceReturnVal = amountReceivedVal != null ? (amountReceivedVal - total) : null;
         const now = new Date().toISOString();
-        const insertOrderSql = `INSERT INTO orders (order_type, total, discount_percentage, created_at, customer_name, customer_phone, customer_address, order_status, payment_status, order_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-        const result = await safeDbUpdate(insertOrderSql, [orderType, total, discountPercent, now, customerName, customerPhone, customerAddress, 'pending', 'pending', orderNote]);
+        const insertOrderSql = `INSERT INTO orders (order_type, total, discount_percentage, created_at, customer_name, customer_phone, customer_address, order_status, payment_status, order_note, amount_received, balance_return) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const result = await safeDbUpdate(insertOrderSql, [orderType, total, discountPercent, now, customerName, customerPhone, customerAddress, 'pending', 'pending', orderNote, amountReceivedVal, balanceReturnVal]);
 
         console.log("Order insert result:", result);
 

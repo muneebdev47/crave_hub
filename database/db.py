@@ -220,6 +220,18 @@ def _initialize_db(conn):
         except sqlite3.OperationalError:
             # Column already exists, ignore
             pass
+
+        # Add amount_received and balance_return for receipt (given/return)
+        try:
+            cursor.execute("ALTER TABLE orders ADD COLUMN amount_received REAL")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE orders ADD COLUMN balance_return REAL")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
         
         # Add is_deal column to menu_items if it doesn't exist (migration)
         try:

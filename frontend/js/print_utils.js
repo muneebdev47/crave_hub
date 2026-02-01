@@ -228,16 +228,27 @@ function generateReceiptText(order, items) {
     // Summary Section - bold headings only
     const discountAmount = (subtotal * discountPercent) / 100;
     const netAmount = subtotal - discountAmount;
-    const paid = order.payment_status === 'paid' ? netAmount : 0;
-    const balance = netAmount - paid;
-    
+    const amountReceived = order.amount_received != null && !isNaN(parseFloat(order.amount_received)) ? parseFloat(order.amount_received) : null;
+    const balanceReturn = order.balance_return != null && !isNaN(parseFloat(order.balance_return)) ? parseFloat(order.balance_return) : null;
+
     // Summary Section - right aligned, bold headings only
     lines.push(RIGHT + bold("No of Pieces:") + "     " + totalQty + LEFT);
     lines.push(RIGHT + bold("Gross Amount:") + "     " + subtotal.toFixed(0) + LEFT);
     lines.push(RIGHT + bold("Discount:") + "         " + discountAmount.toFixed(0) + LEFT);
     lines.push(RIGHT + bold("Net Amount:") + "       " + netAmount.toFixed(0) + LEFT);
-    lines.push(RIGHT + bold("Paid:") + "             " + paid.toFixed(0) + LEFT);
-    lines.push(RIGHT + bold("Balance:") + "          " + balance.toFixed(0) + LEFT);
+    if (amountReceived != null) {
+        const returnAmt = balanceReturn != null ? balanceReturn : Math.max(0, amountReceived - netAmount);
+        lines.push(RIGHT + bold("Given:") + "            " + amountReceived.toFixed(0) + LEFT);
+        lines.push(RIGHT + bold("Return:") + "           " + (returnAmt >= 0 ? returnAmt.toFixed(0) : "0") + LEFT);
+        if (balanceReturn != null && balanceReturn < 0) {
+            lines.push(RIGHT + bold("Short:") + "            " + Math.abs(balanceReturn).toFixed(0) + LEFT);
+        }
+    } else {
+        const paid = order.payment_status === 'paid' ? netAmount : 0;
+        const balance = netAmount - paid;
+        lines.push(RIGHT + bold("Paid:") + "             " + paid.toFixed(0) + LEFT);
+        lines.push(RIGHT + bold("Balance:") + "          " + balance.toFixed(0) + LEFT);
+    }
     lines.push("");
     
     // Notes Section - bold heading only
