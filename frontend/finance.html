@@ -32,11 +32,17 @@
             <div class="finance-filters">
                 <div class="filter-group">
                     <label for="dateFrom">From Date:</label>
-                    <input type="date" id="dateFrom" class="date-input">
+                    <div class="date-input-wrapper">
+                        <input type="date" id="dateFrom" class="date-input">
+                        <span class="date-calendar-icon" id="dateFromCalendarIcon" title="Open calendar" aria-label="Open calendar">📅</span>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label for="dateTo">To Date:</label>
-                    <input type="date" id="dateTo" class="date-input">
+                    <div class="date-input-wrapper">
+                        <input type="date" id="dateTo" class="date-input">
+                        <span class="date-calendar-icon" id="dateToCalendarIcon" title="Open calendar" aria-label="Open calendar">📅</span>
+                    </div>
                 </div>
                 <button id="applyFilter" class="btn-filter">Apply Filter</button>
                 <button id="resetFilter" class="btn-reset">Reset</button>

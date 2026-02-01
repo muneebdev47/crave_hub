@@ -70,6 +70,32 @@ async function safeDbUpdate(sql, params) {
     }
 }
 
+// Open date picker when calendar icon is clicked
+function openDatePicker(inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.focus();
+    if (typeof input.showPicker === 'function') {
+        input.showPicker();
+    }
+}
+
+// Set up calendar icon click handlers for date inputs
+function setupDateCalendarIcons() {
+    const fromIcon = document.getElementById("dateFromCalendarIcon");
+    const toIcon = document.getElementById("dateToCalendarIcon");
+    if (fromIcon) {
+        fromIcon.addEventListener("click", function () {
+            openDatePicker("dateFrom");
+        });
+    }
+    if (toIcon) {
+        toIcon.addEventListener("click", function () {
+            openDatePicker("dateTo");
+        });
+    }
+}
+
 // Initialize Qt WebChannel
 function initWebChannel() {
     if (typeof QWebChannel === 'undefined') {
@@ -82,6 +108,8 @@ function initWebChannel() {
             new QWebChannel(qt.webChannelTransport, function (channel) {
                 window.dbBackend = channel.objects.dbBackend;
                 dbBackend = channel.objects.dbBackend;
+                // Set up calendar icon click handlers
+                setupDateCalendarIcons();
                 // Set default date range to current month
                 const today = new Date();
                 const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -95,6 +123,13 @@ function initWebChannel() {
     } else {
         console.warn("Qt WebChannel not available.");
     }
+}
+
+// Set up calendar icons when DOM is ready (in case WebChannel loads later)
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupDateCalendarIcons);
+} else {
+    setupDateCalendarIcons();
 }
 
 // Load finance data with date filter

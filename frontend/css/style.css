@@ -1661,14 +1661,50 @@ body {
     font-weight: 600;
 }
 
+.date-input-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
 .date-input {
-    padding: 10px;
+    padding: 10px 36px 10px 10px;
     border-radius: 6px;
     border: 1px solid #1A1A1A;
     background-color: #1A1A1A;
     color: #fff;
     font-size: 14px;
     min-width: 150px;
+}
+
+/* Hide the native date input calendar icon - we use our own .date-calendar-icon */
+.date-input-wrapper .date-input::-webkit-calendar-picker-indicator {
+    opacity: 0;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    left: 0;
+}
+.date-input-wrapper .date-input::-webkit-date-and-time-value {
+    text-align: left;
+}
+
+.date-calendar-icon {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    font-size: 18px;
+    opacity: 0.8;
+    pointer-events: auto;
+    user-select: none;
+}
+
+.date-calendar-icon:hover {
+    opacity: 1;
 }
 
 .date-input:focus {
