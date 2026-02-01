@@ -13,7 +13,9 @@ class PrinterBackend(QObject):
             raise RuntimeError("Thermal printing supported on Windows only")
 
         self.printer_name = win32print.GetDefaultPrinter()
-        self.RECEIPT_WIDTH = 384  # 80mm thermal printer (203 DPI)
+        # 80mm paper: 576 dots @ 24/mm (common); 384 is narrower fallback
+        self.RECEIPT_WIDTH = 384
+        self.LOGO_WIDTH = 576   # Full 80mm for logo so it prints bigger
 
     # --------------------------------------------------
     # Resolve logo path (works in dev + PyInstaller)
@@ -47,8 +49,8 @@ class PrinterBackend(QObject):
             # Convert to grayscale
             img = img.convert("L")
 
-            # ---------- Resize to 100% receipt width, centered ----------
-            target_width = self.RECEIPT_WIDTH  # 100% of receipt width
+            # ---------- Resize logo to full 80mm width (bigger on paper) ----------
+            target_width = self.LOGO_WIDTH  # 576 = full 80mm
             w, h = img.size
             ratio = target_width / w
             new_h = int(h * ratio)
@@ -58,10 +60,11 @@ class PrinterBackend(QObject):
             except AttributeError:
                 img = img.resize((target_width, new_h), Image.LANCZOS)
 
-            # ---------- Center logo on receipt-width canvas ----------
-            left_pad = (self.RECEIPT_WIDTH - target_width) // 2  # 0 when target is full width
-            canvas = Image.new("L", (self.RECEIPT_WIDTH, new_h), 255)
-            canvas.paste(img, (left_pad, 0))
+            # ---------- Vertical center: add equal padding above and below ----------
+            pad_vertical = max(24, new_h // 2)  # at least 24 dots, or half logo height
+            total_height = new_h + 2 * pad_vertical
+            canvas = Image.new("L", (target_width, total_height), 255)
+            canvas.paste(img, (0, pad_vertical))  # horizontally full width, vertically centered
             img = canvas
 
             # ---------- Convert to pure B/W ----------
