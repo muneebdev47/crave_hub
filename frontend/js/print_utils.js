@@ -266,7 +266,7 @@ function generateReceiptText(order, items) {
     lines.push("");
     lines.push("");
     lines.push("------------------------------------------------");
-    lines.push("Developed by:  Muneeb 0325 6000 110");
+    lines.push("Developed by:  engineermuneeb07@gmail.com");
     lines.push("");
     lines.push("");
 
