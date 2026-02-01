@@ -165,8 +165,7 @@ function generateReceiptText(order, items) {
     
     // Customer information - right aligned, bold headings only
     if (order.customer_name) {
-        const customerName = order.customer_name.startsWith('Mr. ') || order.customer_name.startsWith('Ms. ') ? order.customer_name : `Mr. ${order.customer_name}`;
-        lines.push(RIGHT + bold("Customer:") + "        " + customerName + LEFT);
+        lines.push(RIGHT + bold("Customer:") + "        " + order.customer_name + LEFT);
     }
     
     if (order.customer_phone) {

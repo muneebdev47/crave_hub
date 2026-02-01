@@ -118,7 +118,7 @@ async function loadTableOrders() {
 
     // Get active table orders (orders with type "Table" and order_status 'pending') grouped by table_number
     const sql = `
-        SELECT o.id, o.total, o.created_at, o.table_number, o.order_status
+        SELECT o.id, o.total, o.created_at, o.table_number, o.order_status, o.discount_percentage, o.order_note, o.amount_received, o.balance_return
         FROM orders o
         WHERE o.order_type = 'Table' AND o.table_number IS NOT NULL AND (o.order_status IS NULL OR o.order_status = 'pending')
         ORDER BY o.table_number
@@ -321,7 +321,7 @@ async function openOrderModal(tableNumber, order) {
                 </div>
                 <div class="payment-received-section" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #444;">
                     <label for="amountReceivedInput" style="color: white; display: block; margin-bottom: 6px; font-size: 14px;">Amount received (Rs.):</label>
-                    <input type="number" id="amountReceivedInput" min="0" step="0.01" placeholder="0" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px;" oninput="updatePaymentBalance()">
+                    <input type="number" id="amountReceivedInput" min="0" step="0.01" placeholder="0" value="${(order.amount_received != null && order.amount_received !== '' && !isNaN(parseFloat(order.amount_received))) ? parseFloat(order.amount_received) : ''}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #444; background-color: #2a2a2a; color: white; font-size: 14px;" oninput="updatePaymentBalance()">
                     <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 15px;">
                         <span style="color: #aaa;">Balance to return:</span>
                         <strong id="balanceReturn" style="color: #4caf50;">Rs. 0.00</strong>
@@ -482,8 +482,9 @@ function updatePaymentBalance() {
     const amountReceivedInput = document.getElementById("amountReceivedInput");
     const balanceReturnEl = document.getElementById("balanceReturn");
     if (!orderTotalEl || !amountReceivedInput || !balanceReturnEl) return;
-    const totalText = orderTotalEl.textContent || "Rs. 0.00";
-    const total = parseFloat(totalText.replace(/[^0-9.-]/g, "")) || 0;
+    // Strip "Rs." prefix first so "Rs. 1120.00" doesn't become ".112000" (0.112)
+    const totalText = (orderTotalEl.textContent || "0").replace(/^Rs\.?\s*/i, "").replace(/,/g, "").trim();
+    const total = parseFloat(totalText) || 0;
     const received = parseFloat(amountReceivedInput.value) || 0;
     const balance = received - total;
     if (balance >= 0) {
@@ -789,10 +790,15 @@ async function updateOrder() {
         // Get order note
         const orderNoteInput = document.getElementById("orderNoteInput");
         const orderNote = orderNoteInput ? orderNoteInput.value.trim() : '';
+        // Amount received and balance to return (for receipt)
+        const amountReceivedInput = document.getElementById("amountReceivedInput");
+        const amountReceived = amountReceivedInput ? parseFloat(amountReceivedInput.value) : null;
+        const amountReceivedVal = (amountReceived != null && !isNaN(amountReceived) && amountReceived > 0) ? amountReceived : null;
+        const balanceReturnVal = amountReceivedVal != null ? (amountReceivedVal - total) : null;
 
-        // Update order total and note
-        const updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, order_note = ? WHERE id = ?`;
-        await safeDbUpdate(updateOrderSql, [total, discountPercent, orderNote, currentOrderId]);
+        // Update order total, note, and payment fields
+        const updateOrderSql = `UPDATE orders SET total = ?, discount_percentage = ?, order_note = ?, amount_received = ?, balance_return = ? WHERE id = ?`;
+        await safeDbUpdate(updateOrderSql, [total, discountPercent, orderNote, amountReceivedVal, balanceReturnVal, currentOrderId]);
 
         // Delete existing order items
         const deleteItemsSql = `DELETE FROM order_items WHERE order_id = ?`;
