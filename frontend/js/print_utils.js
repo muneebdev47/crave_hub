@@ -157,6 +157,8 @@ function generateReceiptText(order, items) {
     
     // Order Information Section - right aligned, bold headings only
     lines.push(RIGHT + bold("Order No:") + "        " + orderNo + LEFT);
+    const orderTypeLabel = order.order_type === 'Table' ? 'Table Order' : (order.order_type === 'Delivery' ? 'Delivery Order' : 'Takeaway Order');
+    lines.push(RIGHT + bold("Order Type:") + "      " + orderTypeLabel + LEFT);
     lines.push(RIGHT + bold("Order Date:") + "      " + orderDate + LEFT);
     lines.push(RIGHT + bold("Print Time:") + "      " + printDateTime + LEFT);
     lines.push("");
@@ -171,16 +173,13 @@ function generateReceiptText(order, items) {
         lines.push(RIGHT + bold("Phone:") + "           " + order.customer_phone + LEFT);
     }
     
-    if (order.table_number) {
+    if (order.table_number != null && order.table_number !== undefined) {
         lines.push(RIGHT + bold("Table:") + "           " + order.table_number + LEFT);
     }
     
-    // Address - for delivery orders use customer_address, otherwise default - right aligned, bold heading only
+    // Address - only for delivery orders
     if (order.order_type === 'Delivery' && order.customer_address) {
         lines.push(RIGHT + bold("Address:") + "         " + order.customer_address + LEFT);
-    } else if (order.order_type !== 'Delivery') {
-        // For non-delivery orders, show default address
-        lines.push(RIGHT + bold("Address:") + "         Interloop Apparel #2 Hostels" + LEFT);
     }
     lines.push(RIGHT + bold("Order Due Date:") + "  " + orderDate + LEFT);
     lines.push("");
