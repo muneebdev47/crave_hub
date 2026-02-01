@@ -47,8 +47,8 @@ class PrinterBackend(QObject):
             # Convert to grayscale
             img = img.convert("L")
 
-            # ---------- Resize (85–95% width looks best) ----------
-            target_width = int(self.RECEIPT_WIDTH * 0.90)
+            # ---------- Resize to 100% receipt width, centered ----------
+            target_width = self.RECEIPT_WIDTH  # 100% of receipt width
             w, h = img.size
             ratio = target_width / w
             new_h = int(h * ratio)
@@ -58,8 +58,8 @@ class PrinterBackend(QObject):
             except AttributeError:
                 img = img.resize((target_width, new_h), Image.LANCZOS)
 
-            # ---------- Center logo on 384px canvas ----------
-            left_pad = (self.RECEIPT_WIDTH - target_width) // 2
+            # ---------- Center logo on receipt-width canvas ----------
+            left_pad = (self.RECEIPT_WIDTH - target_width) // 2  # 0 when target is full width
             canvas = Image.new("L", (self.RECEIPT_WIDTH, new_h), 255)
             canvas.paste(img, (left_pad, 0))
             img = canvas
