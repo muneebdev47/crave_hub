@@ -76,16 +76,32 @@ class DatabaseBackend(QObject):
         Returns last_insert_id for INSERT queries.
         """
         try:
+            # Normalize inputs (QWebChannel may pass None or wrong type)
+            if not isinstance(sql_query, str):
+                sql_query = str(sql_query) if sql_query else ""
+            if params_json is None or not isinstance(params_json, str):
+                params_json = "[]"
+            try:
+                params = json.loads(params_json)
+            except (json.JSONDecodeError, TypeError) as e:
+                return json.dumps({"success": False, "error": f"Invalid params JSON: {e}"})
+            if params is None:
+                params = []
+            elif not isinstance(params, (list, tuple)):
+                params = [params]
+
             conn = get_connection()
             cursor = conn.cursor()
-            params = json.loads(params_json)
             cursor.execute(sql_query, params)
 
             # Check if it's a SELECT query
             if sql_query.strip().upper().startswith("SELECT"):
-                columns = [description[0] for description in cursor.description]
-                rows = cursor.fetchall()
-                result = [dict(zip(columns, row)) for row in rows]
+                if cursor.description:
+                    columns = [d[0] for d in cursor.description]
+                    rows = cursor.fetchall()
+                    result = [dict(zip(columns, row)) for row in rows]
+                else:
+                    result = []
                 conn.close()
                 return json.dumps(result)
             else:

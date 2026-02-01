@@ -12,7 +12,7 @@ async function safeDbQuery(sql, params, dbBackend) {
         let response;
         
         if (params && Array.isArray(params) && params.length > 0) {
-            // Use parameterized query
+            // Use parameterized query (always pass a string; backend expects JSON array)
             const paramsJson = JSON.stringify(params);
             response = backend.execute_with_params(sql, paramsJson);
         } else {
