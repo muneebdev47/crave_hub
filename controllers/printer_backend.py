@@ -24,7 +24,7 @@ class PrinterBackend(QObject):
         except AttributeError:
             base_path = Path(__file__).resolve().parent.parent  # Dev
 
-        for name in ("logo.png", "logo.ico", "logo.jpg", "logo.jpeg"):
+        for name in ("receipt_logo.png", "receipt_logo_2.png"):
             p = base_path / "assets" / name
             if p.exists():
                 return p
@@ -106,11 +106,10 @@ class PrinterBackend(QObject):
             win32print.StartDocPrinter(hPrinter, 1, ("CraveHub Receipt", None, "RAW"))
             win32print.StartPagePrinter(hPrinter)
 
-            # ---------- RESET printer state ----------
+            # ---------- RESET printer state (minimal - avoid half-width/squeezed print) ----------
             win32print.WritePrinter(hPrinter, b"\x1B\x40")  # ESC @ (reset)
-            win32print.WritePrinter(hPrinter, b"\x1B\x32")  # ESC 2 = default line spacing (prevents compressed text)
-            win32print.WritePrinter(hPrinter, b"\x1D\x4C\x00\x00")  # Left margin = 0
-            win32print.WritePrinter(hPrinter, b"\x1D\x57\x80\x01")  # Width = 384
+            win32print.WritePrinter(hPrinter, b"\x1B\x32")  # ESC 2 = default line spacing
+            # Do NOT set GS W (width) or GS L (margin) - use printer default full width
             win32print.WritePrinter(hPrinter, b"\x1B\x61\x00")  # Align LEFT
 
             # ---------- Print logo ----------
