@@ -152,7 +152,7 @@ function generateReceiptText(order, items) {
     // Header - centered (no space on top)
     lines.push(CENTER + BOLD_ON + "                  CRAVEHUB CAFE" + BOLD_OFF + LEFT);
     lines.push(CENTER + "          Interloop Apparel # 2 Hostels" + LEFT);
-    lines.push(CENTER + "                 +92 304 04 65 000" + LEFT);
+    lines.push(CENTER + BOLD_ON + "                 +92 304 04 65 000" + BOLD_OFF + LEFT);
     lines.push("");
     
     // Order Information Section - right aligned, bold headings only
