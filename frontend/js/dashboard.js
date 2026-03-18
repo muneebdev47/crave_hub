@@ -137,7 +137,7 @@ async function loadKPIs() {
 
     // Today's orders
     const todayOrdersSql = `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue FROM orders WHERE date(created_at) = '${today}'`;
-    const todayCompletedOrdersSql = `SELECT COUNT(*) as count FROM orders WHERE date(created_at) = '${today}' AND order_status = 'completed'`;
+    const todayCompletedOrdersSql = `SELECT COALESCE(SUM(total), 0) as revenue FROM orders WHERE date(created_at) = '${today}' AND order_status = 'completed'`;
     const todayData = await safeDbQuery(todayOrdersSql);
     const todayCompletedOrdersData = await safeDbQuery(todayCompletedOrdersSql);
     console.log("Today's data:", todayData);
