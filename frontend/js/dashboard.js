@@ -137,7 +137,9 @@ async function loadKPIs() {
 
     // Today's orders
     const todayOrdersSql = `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue FROM orders WHERE date(created_at) = '${today}'`;
+    const todayCompletedOrdersSql = `SELECT COUNT(*) as count FROM orders WHERE date(created_at) = '${today}' AND order_status = 'completed'`;
     const todayData = await safeDbQuery(todayOrdersSql);
+    const todayCompletedOrdersData = await safeDbQuery(todayCompletedOrdersSql);
     console.log("Today's data:", todayData);
 
     // Total orders
@@ -161,14 +163,14 @@ async function loadKPIs() {
 
     // Update KPI values
     const todayOrders = todayData[0]?.count || 0;
-    const todayRevenue = todayData[0]?.revenue || 0;
+    const todayCompletedRevenue = todayCompletedOrdersData[0]?.revenue || 0;
     const totalOrders = totalOrdersData[0]?.count || 0;
     const monthlyOrders = monthlyOrdersData[0]?.count || 0;
     const topItem = topItemData[0]?.name || "N/A";
 
     console.log("KPI Values:", {
         todayOrders,
-        todayRevenue,
+        todayCompletedRevenue,
         totalOrders,
         monthlyOrders,
         topItem
@@ -179,7 +181,7 @@ async function loadKPIs() {
         kpiValues[0].textContent = todayOrders;
         kpiValues[1].textContent = todayOrders; // Completed (same for now)
         kpiValues[2].textContent = 0; // Cancelled
-        kpiValues[3].textContent = `Rs. ${parseFloat(todayRevenue).toLocaleString()}`;
+        kpiValues[3].textContent = `Rs. ${parseFloat(todayCompletedRevenue).toLocaleString()}`;
         kpiValues[4].textContent = totalOrders;
         kpiValues[5].textContent = monthlyOrders;
         kpiValues[6].textContent = topItem;
